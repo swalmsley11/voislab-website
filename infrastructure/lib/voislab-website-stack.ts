@@ -52,8 +52,6 @@ export class VoislabWebsiteStack extends cdk.Stack {
     // S3 bucket for website hosting
     const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
       bucketName: `voislab-website-${environment}-${this.account}`,
-      websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'error.html',
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       versioned: true,
