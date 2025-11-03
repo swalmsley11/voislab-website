@@ -1,0 +1,471 @@
+/* Music Library Styles */
+.music-library {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  color: white;
+  min-height: 100vh;
+}
+
+.library-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.library-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.library-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.library-description {
+  font-size: 1.1rem;
+  opacity: 0.8;
+  margin: 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.library-controls {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-filter-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-container {
+  flex: 1;
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  stroke: #ccc;
+  fill: none;
+  stroke-width: 2;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.search-input::placeholder {
+  color: #ccc;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.filter-container {
+  min-width: 150px;
+}
+
+.genre-filter {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.genre-filter:focus {
+  outline: none;
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.genre-filter option {
+  background: #1a1a2e;
+  color: white;
+}
+
+.view-sort-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.view-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.view-button {
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.view-button.active {
+  background: #4ecdc4;
+  border-color: #4ecdc4;
+  color: #1a1a2e;
+}
+
+.view-icon {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.sort-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sort-label {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.sort-select {
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: #4ecdc4;
+}
+
+.sort-select option {
+  background: #1a1a2e;
+  color: white;
+}
+
+.library-stats {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.track-count {
+  font-size: 0.9rem;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #ccc;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  stroke: #666;
+  fill: none;
+  stroke-width: 1;
+  margin: 0 auto 1rem;
+  display: block;
+}
+
+.empty-state h3 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+  color: white;
+}
+
+.empty-state p {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.tracks-container {
+  display: grid;
+  gap: 2rem;
+}
+
+.tracks-container.grid {
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+}
+
+.tracks-container.list {
+  grid-template-columns: 1fr;
+}
+
+.track-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.track-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border-color: rgba(78, 205, 196, 0.3);
+}
+
+.track-info {
+  margin-bottom: 1.5rem;
+}
+
+.track-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.track-description {
+  color: #ccc;
+  line-height: 1.5;
+  margin: 0 0 1rem 0;
+}
+
+.track-metadata {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.track-duration,
+.track-date,
+.track-genre {
+  font-size: 0.9rem;
+  color: #aaa;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+}
+
+.track-genre {
+  background: rgba(78, 205, 196, 0.2);
+  color: #4ecdc4;
+}
+
+.track-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.8rem;
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+  padding: 0.25rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.track-player {
+  margin-top: 1rem;
+}
+
+/* List view specific styles */
+.tracks-container.list .track-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  align-items: center;
+}
+
+.tracks-container.list .track-info {
+  margin-bottom: 0;
+}
+
+.tracks-container.list .track-player {
+  margin-top: 0;
+  min-width: 400px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .music-library {
+    padding: 2rem 0;
+  }
+
+  .library-container {
+    padding: 0 1rem;
+  }
+
+  .library-title {
+    font-size: 2rem;
+  }
+
+  .library-controls {
+    padding: 1rem;
+  }
+
+  .search-filter-row {
+    flex-direction: column;
+  }
+
+  .view-sort-row {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .sort-container {
+    justify-content: center;
+  }
+
+  .tracks-container.grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracks-container.list .track-item {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .tracks-container.list .track-player {
+    min-width: auto;
+  }
+
+  .track-metadata {
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .library-title {
+    font-size: 1.75rem;
+  }
+
+  .library-description {
+    font-size: 1rem;
+  }
+
+  .track-item {
+    padding: 1rem;
+  }
+
+  .track-title {
+    font-size: 1.1rem;
+  }
+
+  .track-metadata {
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+
+  .track-duration,
+  .track-date,
+  .track-genre {
+    font-size: 0.8rem;
+  }
+}/* Loadi
+ng and Error States */
+.library-loading,
+.library-error {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.library-loading p,
+.library-error p {
+  font-size: 1.125rem;
+  color: #ccc;
+  margin-bottom: 1rem;
+}
+
+.library-warning {
+  background: rgba(255, 243, 205, 0.1);
+  border: 1px solid rgba(255, 234, 167, 0.3);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.library-warning p {
+  margin: 0;
+  color: #ffd93d;
+  font-size: 0.875rem;
+}
+
+.retry-button {
+  background: #4ecdc4;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.retry-button:hover {
+  background: #45b7aa;
+}
+
+/* Streaming Links in Track Items */
+.track-streaming-links {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}

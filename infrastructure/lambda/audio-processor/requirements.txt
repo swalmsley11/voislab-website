@@ -1,0 +1,8 @@
+# AWS SDK is provided by Lambda runtime
+boto3>=1.26.0
+botocore>=1.29.0
+
+# Audio processing libraries (will be added in Lambda layer)
+# mutagen>=1.46.0  # For advanced audio metadata extraction
+# pydub>=0.25.1    # For audio format conversion
+# ffmpeg-python>=0.2.0  # For FFmpeg integration

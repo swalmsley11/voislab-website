@@ -1,0 +1,271 @@
+name: Infrastructure Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy infrastructure to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - production
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - destroy
+        - diff
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  infrastructure-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Configure AWS credentials for DEV
+        if: github.event.inputs.environment == 'development'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials for PROD
+        if: github.event.inputs.environment == 'production'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: Run infrastructure tests
+        working-directory: infrastructure
+        run: npm test
+
+      - name: Build infrastructure
+        working-directory: infrastructure
+        run: npm run build
+
+      - name: CDK Bootstrap (if needed)
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run bootstrap -- --context environment=dev
+          else
+            npm run bootstrap -- --context environment=prod
+          fi
+
+      - name: CDK Diff
+        if: github.event.inputs.action == 'diff'
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run diff -- --context environment=dev
+          else
+            npm run diff -- --context environment=prod
+          fi
+
+      - name: Pre-deployment validation
+        if: github.event.inputs.action == 'deploy'
+        working-directory: infrastructure
+        run: |
+          echo "Running pre-deployment validation..."
+          
+          # Check if stack exists and get current status
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME &>/dev/null; then
+            CURRENT_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+            echo "Current stack status: $CURRENT_STATUS"
+            
+            # Check if stack is in a deployable state
+            if [[ "$CURRENT_STATUS" == *"IN_PROGRESS"* ]]; then
+              echo "❌ Stack is currently being updated. Please wait for completion."
+              exit 1
+            elif [[ "$CURRENT_STATUS" == *"FAILED"* ]]; then
+              echo "⚠️ Stack is in a failed state: $CURRENT_STATUS"
+              echo "Manual intervention may be required before deployment"
+            fi
+          else
+            echo "Stack does not exist - will create new stack"
+          fi
+          
+          # Validate CDK synthesis
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run synth -- --context environment=dev
+          else
+            npm run synth -- --context environment=prod
+          fi
+          
+          echo "✅ Pre-deployment validation completed"
+
+      - name: Create deployment backup
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          # Export current stack template for rollback
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME &>/dev/null; then
+            echo "Creating backup of current stack template..."
+            aws cloudformation get-template --stack-name $STACK_NAME --template-stage Processed > "backup-${STACK_NAME}-${TIMESTAMP}.json"
+            echo "BACKUP_FILE=backup-${STACK_NAME}-${TIMESTAMP}.json" >> $GITHUB_ENV
+            echo "✅ Stack backup created: backup-${STACK_NAME}-${TIMESTAMP}.json"
+          else
+            echo "No existing stack to backup"
+          fi
+
+      - name: CDK Deploy
+        if: github.event.inputs.action == 'deploy'
+        working-directory: infrastructure
+        run: |
+          echo "Starting CDK deployment..."
+          
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run deploy:dev -- --require-approval never
+          else
+            npm run deploy:prod -- --require-approval never
+          fi
+          
+          echo "✅ CDK deployment completed"
+
+      - name: CDK Destroy
+        if: github.event.inputs.action == 'destroy'
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            cdk destroy --context environment=dev --force
+          else
+            cdk destroy --context environment=prod --force
+          fi
+
+      - name: Post-deployment validation
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          echo "Validating deployment..."
+          
+          # Check stack status
+          STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+          echo "Final stack status: $STACK_STATUS"
+          
+          if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
+            echo "❌ Deployment failed with status: $STACK_STATUS"
+            exit 1
+          fi
+          
+          # Validate key resources exist
+          echo "Validating key resources..."
+          
+          # Check if required outputs exist
+          REQUIRED_OUTPUTS=("UploadBucketName" "MediaBucketName" "AudioMetadataTableName")
+          
+          for output in "${REQUIRED_OUTPUTS[@]}"; do
+            VALUE=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='$output'].OutputValue" --output text)
+            if [ -z "$VALUE" ]; then
+              echo "❌ Required output missing: $output"
+              exit 1
+            else
+              echo "✅ $output: $VALUE"
+            fi
+          done
+          
+          # Test Lambda functions
+          echo "Testing Lambda functions..."
+          AUDIO_PROCESSOR=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='AudioProcessorFunctionName'].OutputValue" --output text)
+          
+          if [ -n "$AUDIO_PROCESSOR" ]; then
+            aws lambda get-function --function-name $AUDIO_PROCESSOR > /dev/null
+            echo "✅ Audio processor function is accessible"
+          fi
+          
+          echo "✅ Post-deployment validation completed successfully"
+
+      - name: Output stack information
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs' --output table
+          
+          echo ""
+          echo "=== Stack Resources ==="
+          aws cloudformation list-stack-resources --stack-name $STACK_NAME --query 'StackResourceSummaries[?ResourceStatus!=`DELETE_COMPLETE`].[LogicalResourceId,ResourceType,ResourceStatus]' --output table
+
+  rollback-infrastructure:
+    runs-on: ubuntu-latest
+    if: failure() && github.event.inputs.action == 'deploy'
+    needs: [infrastructure-deploy]
+    environment: ${{ github.event.inputs.environment }}-rollback
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for DEV
+        if: github.event.inputs.environment == 'development'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials for PROD
+        if: github.event.inputs.environment == 'production'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Attempt automatic rollback
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          echo "Attempting to rollback stack: $STACK_NAME"
+          
+          # Check current stack status
+          CURRENT_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+          echo "Current stack status: $CURRENT_STATUS"
+          
+          # Attempt different rollback strategies based on status
+          case $CURRENT_STATUS in
+            "UPDATE_ROLLBACK_FAILED"|"UPDATE_FAILED")
+              echo "Attempting to continue update rollback..."
+              aws cloudformation continue-update-rollback --stack-name $STACK_NAME || echo "Continue rollback failed"
+              ;;
+            "CREATE_FAILED")
+              echo "Deleting failed stack..."
+              aws cloudformation delete-stack --stack-name $STACK_NAME || echo "Delete stack failed"
+              ;;
+            "UPDATE_IN_PROGRESS")
+              echo "Cancelling update in progress..."
+              aws cloudformation cancel-update-stack --stack-name $STACK_NAME || echo "Cancel update failed"
+              ;;
+            *)
+              echo "Stack status $CURRENT_STATUS - manual intervention may be required"
+              ;;
+          esac
+          
+          echo "Rollback attempt completed - please check AWS Console for final status"

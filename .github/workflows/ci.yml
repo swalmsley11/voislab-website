@@ -1,0 +1,379 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - production
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check Prettier formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Test build artifacts
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Build failed: dist directory not found"
+            exit 1
+          fi
+          if [ ! -f "dist/index.html" ]; then
+            echo "Build failed: index.html not found"
+            exit 1
+          fi
+          echo "Build validation successful"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: dist/
+          retention-days: 30
+
+  test-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: Run infrastructure tests
+        working-directory: infrastructure
+        run: npm test
+
+      - name: Build infrastructure
+        working-directory: infrastructure
+        run: npm run build
+
+      - name: Synthesize CDK
+        working-directory: infrastructure
+        run: npm run synth
+
+      - name: Validate CDK template
+        working-directory: infrastructure
+        run: |
+          if [ ! -f "cdk.out/VoislabWebsite-dev.template.json" ]; then
+            echo "CDK synthesis failed: template not found"
+            exit 1
+          fi
+          echo "CDK template validation successful"
+
+      - name: Upload CDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-templates
+          path: infrastructure/cdk.out/
+          retention-days: 30
+
+  deploy-dev:
+    needs: [test-frontend, test-infrastructure]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development')
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: dist/
+
+      - name: Download CDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cdk-templates
+          path: infrastructure/cdk.out/
+
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: Deploy infrastructure to DEV
+        working-directory: infrastructure
+        run: npm run deploy:dev
+
+      - name: Wait for stack deployment
+        run: |
+          aws cloudformation wait stack-update-complete --stack-name VoislabWebsite-dev || \
+          aws cloudformation wait stack-create-complete --stack-name VoislabWebsite-dev
+
+      - name: Check deployment type
+        id: deployment-type
+        run: |
+          # Check if Amplify app exists in the stack
+          AMPLIFY_APP_ID=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-dev --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppId`].OutputValue' --output text 2>/dev/null || echo "")
+          if [ -n "$AMPLIFY_APP_ID" ]; then
+            echo "deployment_type=amplify" >> $GITHUB_OUTPUT
+            echo "amplify_app_id=$AMPLIFY_APP_ID" >> $GITHUB_OUTPUT
+          else
+            echo "deployment_type=s3" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Amplify (if configured)
+        if: steps.deployment-type.outputs.deployment_type == 'amplify'
+        run: |
+          AMPLIFY_APP_ID="${{ steps.deployment-type.outputs.amplify_app_id }}"
+          BRANCH_NAME=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-dev --query 'Stacks[0].Outputs[?OutputKey==`AmplifyBranchName`].OutputValue' --output text)
+          
+          echo "Triggering Amplify deployment for app: $AMPLIFY_APP_ID, branch: $BRANCH_NAME"
+          JOB_ID=$(aws amplify start-job --app-id $AMPLIFY_APP_ID --branch-name $BRANCH_NAME --job-type RELEASE --query 'jobSummary.jobId' --output text)
+          
+          echo "Amplify deployment job started: $JOB_ID"
+          echo "Waiting for deployment to complete..."
+          
+          # Wait for deployment to complete (max 10 minutes)
+          for i in {1..60}; do
+            STATUS=$(aws amplify get-job --app-id $AMPLIFY_APP_ID --branch-name $BRANCH_NAME --job-id $JOB_ID --query 'job.summary.status' --output text)
+            echo "Deployment status: $STATUS"
+            
+            if [ "$STATUS" = "SUCCEED" ]; then
+              echo "✅ Amplify deployment completed successfully"
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "❌ Amplify deployment failed with status: $STATUS"
+              exit 1
+            fi
+            
+            sleep 10
+          done
+
+      - name: Deploy frontend to S3 (fallback)
+        if: steps.deployment-type.outputs.deployment_type == 's3'
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-dev --query 'Stacks[0].Outputs[?OutputKey==`WebsiteBucketName`].OutputValue' --output text)
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "Failed to get bucket name from CloudFormation stack"
+            exit 1
+          fi
+          aws s3 sync dist/ s3://$BUCKET_NAME --delete
+
+      - name: Invalidate CloudFront cache (S3 deployment)
+        if: steps.deployment-type.outputs.deployment_type == 's3'
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-dev --query 'Stacks[0].Outputs[?OutputKey==`WebsiteDistributionId`].OutputValue' --output text)
+          if [ -z "$DISTRIBUTION_ID" ]; then
+            echo "Failed to get distribution ID from CloudFormation stack"
+            exit 1
+          fi
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+
+      - name: Post-deployment validation
+        run: |
+          WEBSITE_URL=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-dev --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' --output text)
+          if [ -n "$WEBSITE_URL" ]; then
+            echo "DEV deployment successful: $WEBSITE_URL"
+            # Basic health check
+            curl -f -s "$WEBSITE_URL" > /dev/null || echo "Warning: Website health check failed"
+          fi
+
+  deploy-prod:
+    needs: [test-frontend, test-infrastructure]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: 
+      name: production
+      url: ${{ steps.get-url.outputs.website_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: dist/
+
+      - name: Download CDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cdk-templates
+          path: infrastructure/cdk.out/
+
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: Deploy infrastructure to PROD
+        working-directory: infrastructure
+        run: npm run deploy:prod
+
+      - name: Wait for stack deployment
+        run: |
+          aws cloudformation wait stack-update-complete --stack-name VoislabWebsite-prod || \
+          aws cloudformation wait stack-create-complete --stack-name VoislabWebsite-prod
+
+      - name: Check deployment type
+        id: deployment-type
+        run: |
+          # Check if Amplify app exists in the stack
+          AMPLIFY_APP_ID=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-prod --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppId`].OutputValue' --output text 2>/dev/null || echo "")
+          if [ -n "$AMPLIFY_APP_ID" ]; then
+            echo "deployment_type=amplify" >> $GITHUB_OUTPUT
+            echo "amplify_app_id=$AMPLIFY_APP_ID" >> $GITHUB_OUTPUT
+          else
+            echo "deployment_type=s3" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Amplify (if configured)
+        if: steps.deployment-type.outputs.deployment_type == 'amplify'
+        run: |
+          AMPLIFY_APP_ID="${{ steps.deployment-type.outputs.amplify_app_id }}"
+          BRANCH_NAME=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-prod --query 'Stacks[0].Outputs[?OutputKey==`AmplifyBranchName`].OutputValue' --output text)
+          
+          echo "Triggering Amplify deployment for app: $AMPLIFY_APP_ID, branch: $BRANCH_NAME"
+          JOB_ID=$(aws amplify start-job --app-id $AMPLIFY_APP_ID --branch-name $BRANCH_NAME --job-type RELEASE --query 'jobSummary.jobId' --output text)
+          
+          echo "Amplify deployment job started: $JOB_ID"
+          echo "Waiting for deployment to complete..."
+          
+          # Wait for deployment to complete (max 15 minutes for production)
+          for i in {1..90}; do
+            STATUS=$(aws amplify get-job --app-id $AMPLIFY_APP_ID --branch-name $BRANCH_NAME --job-id $JOB_ID --query 'job.summary.status' --output text)
+            echo "Deployment status: $STATUS"
+            
+            if [ "$STATUS" = "SUCCEED" ]; then
+              echo "✅ Amplify deployment completed successfully"
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "❌ Amplify deployment failed with status: $STATUS"
+              exit 1
+            fi
+            
+            sleep 10
+          done
+
+      - name: Deploy frontend to S3 (fallback)
+        if: steps.deployment-type.outputs.deployment_type == 's3'
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-prod --query 'Stacks[0].Outputs[?OutputKey==`WebsiteBucketName`].OutputValue' --output text)
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "Failed to get bucket name from CloudFormation stack"
+            exit 1
+          fi
+          aws s3 sync dist/ s3://$BUCKET_NAME --delete
+
+      - name: Invalidate CloudFront cache (S3 deployment)
+        if: steps.deployment-type.outputs.deployment_type == 's3'
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-prod --query 'Stacks[0].Outputs[?OutputKey==`WebsiteDistributionId`].OutputValue' --output text)
+          if [ -z "$DISTRIBUTION_ID" ]; then
+            echo "Failed to get distribution ID from CloudFormation stack"
+            exit 1
+          fi
+          INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*" --query 'Invalidation.Id' --output text)
+          echo "CloudFront invalidation created: $INVALIDATION_ID"
+
+      - name: Get website URL
+        id: get-url
+        run: |
+          WEBSITE_URL=$(aws cloudformation describe-stacks --stack-name VoislabWebsite-prod --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' --output text)
+          echo "website_url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          echo "PROD deployment successful: $WEBSITE_URL"
+
+      - name: Post-deployment validation
+        run: |
+          WEBSITE_URL="${{ steps.get-url.outputs.website_url }}"
+          if [ -n "$WEBSITE_URL" ]; then
+            # Wait for CloudFront invalidation to propagate
+            sleep 30
+            # Basic health check
+            curl -f -s "$WEBSITE_URL" > /dev/null || echo "Warning: Website health check failed"
+            echo "Production deployment validation completed"
+          fi
+
+  rollback-prod:
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: [deploy-prod]
+    environment: production-rollback
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Rollback CloudFormation stack
+        run: |
+          echo "Initiating rollback for VoislabWebsite-prod stack"
+          aws cloudformation cancel-update-stack --stack-name VoislabWebsite-prod || true
+          aws cloudformation continue-update-rollback --stack-name VoislabWebsite-prod || true
+          echo "Rollback initiated - manual intervention may be required"

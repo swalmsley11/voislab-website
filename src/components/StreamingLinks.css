@@ -1,0 +1,107 @@
+/**
+ * StreamingLinks Component Styles
+ */
+
+.streaming-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.streaming-links__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.streaming-links__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.streaming-links__link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--platform-color, #666);
+  color: white;
+  text-decoration: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-height: 2.5rem;
+}
+
+.streaming-links__link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+}
+
+.streaming-links__link:active {
+  transform: translateY(0);
+}
+
+.streaming-links__icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.streaming-links__name {
+  white-space: nowrap;
+}
+
+/* Size variants */
+.streaming-links--small .streaming-links__link {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  min-height: 2rem;
+}
+
+.streaming-links--small .streaming-links__icon {
+  font-size: 1rem;
+}
+
+.streaming-links--large .streaming-links__link {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  min-height: 3rem;
+}
+
+.streaming-links--large .streaming-links__icon {
+  font-size: 1.5rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .streaming-links__list {
+    gap: 0.5rem;
+  }
+  
+  .streaming-links__link {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .streaming-links__name {
+    display: none;
+  }
+  
+  .streaming-links__icon {
+    font-size: 1.125rem;
+  }
+}
+
+/* Icon-only mode for mobile */
+@media (max-width: 480px) {
+  .streaming-links__link {
+    padding: 0.5rem;
+    min-width: 2.5rem;
+    justify-content: center;
+  }
+}

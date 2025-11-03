@@ -1,0 +1,3 @@
+# AWS SDK is provided by Lambda runtime
+boto3>=1.26.0
+botocore>=1.29.0

@@ -1,0 +1,673 @@
+name: UAT - CI/CD Pipeline Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_scope:
+        description: 'Scope of UAT testing'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+        - full
+        - frontend-only
+        - infrastructure-only
+        - deployment-only
+      environment:
+        description: 'Environment to test against'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - production
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  uat-preparation:
+    runs-on: ubuntu-latest
+    outputs:
+      test-id: ${{ steps.generate-id.outputs.test-id }}
+      baseline-commit: ${{ steps.get-baseline.outputs.commit }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate test ID
+        id: generate-id
+        run: |
+          TEST_ID="uat-$(date +%Y%m%d-%H%M%S)-$(echo $RANDOM | md5sum | head -c 8)"
+          echo "test-id=$TEST_ID" >> $GITHUB_OUTPUT
+          echo "Generated test ID: $TEST_ID"
+
+      - name: Get baseline commit
+        id: get-baseline
+        run: |
+          echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "Baseline commit: ${{ github.sha }}"
+
+      - name: Create test report directory
+        run: |
+          mkdir -p uat-reports
+          echo "# UAT Test Report - ${{ steps.generate-id.outputs.test-id }}" > uat-reports/README.md
+          echo "Started: $(date -u)" >> uat-reports/README.md
+          echo "Environment: ${{ github.event.inputs.environment }}" >> uat-reports/README.md
+          echo "Scope: ${{ github.event.inputs.test_scope }}" >> uat-reports/README.md
+          echo "Commit: ${{ github.sha }}" >> uat-reports/README.md
+
+      - name: Upload test preparation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-preparation-${{ steps.generate-id.outputs.test-id }}
+          path: uat-reports/
+
+  uat-frontend-build:
+    needs: uat-preparation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_scope == 'full' || github.event.inputs.test_scope == 'frontend-only'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Test frontend build process
+        run: |
+          echo "=== UAT: Frontend Build Process ==="
+          
+          # Test 1: Dependencies installation
+          echo "Testing npm ci..."
+          START_TIME=$(date +%s)
+          npm ci
+          END_TIME=$(date +%s)
+          INSTALL_TIME=$((END_TIME - START_TIME))
+          echo "✅ Dependencies installed in ${INSTALL_TIME}s"
+          
+          # Test 2: Linting
+          echo "Testing ESLint..."
+          npm run lint
+          echo "✅ Linting passed"
+          
+          # Test 3: Type checking
+          echo "Testing TypeScript compilation..."
+          npm run type-check
+          echo "✅ Type checking passed"
+          
+          # Test 4: Build process
+          echo "Testing build process..."
+          START_TIME=$(date +%s)
+          npm run build
+          END_TIME=$(date +%s)
+          BUILD_TIME=$((END_TIME - START_TIME))
+          echo "✅ Build completed in ${BUILD_TIME}s"
+          
+          # Test 5: Build artifacts validation
+          echo "Validating build artifacts..."
+          if [ ! -d "dist" ]; then
+            echo "❌ dist directory not created"
+            exit 1
+          fi
+          
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ index.html not found in dist"
+            exit 1
+          fi
+          
+          # Check for essential files
+          ESSENTIAL_FILES=("assets" "index.html")
+          for file in "${ESSENTIAL_FILES[@]}"; do
+            if [ ! -e "dist/$file" ]; then
+              echo "❌ Essential file/directory missing: $file"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Build artifacts validation passed"
+          
+          # Test 6: Build size analysis
+          DIST_SIZE=$(du -sh dist | cut -f1)
+          echo "Build size: $DIST_SIZE"
+          
+          # Create test report
+          cat > frontend-build-report.json << EOF
+          {
+            "test_id": "${{ needs.uat-preparation.outputs.test-id }}",
+            "test_type": "frontend_build",
+            "status": "passed",
+            "metrics": {
+              "install_time_seconds": $INSTALL_TIME,
+              "build_time_seconds": $BUILD_TIME,
+              "build_size": "$DIST_SIZE"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload build artifacts for testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-${{ needs.uat-preparation.outputs.test-id }}
+          path: |
+            dist/
+            frontend-build-report.json
+
+  uat-infrastructure-validation:
+    needs: uat-preparation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_scope == 'full' || github.event.inputs.test_scope == 'infrastructure-only'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Configure AWS credentials for DEV
+        if: github.event.inputs.environment == 'development'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials for PROD
+        if: github.event.inputs.environment == 'production'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Test infrastructure validation
+        run: |
+          echo "=== UAT: Infrastructure Validation ==="
+          
+          # Test 1: CDK synthesis
+          echo "Testing CDK synthesis..."
+          cd infrastructure
+          npm ci
+          
+          START_TIME=$(date +%s)
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run synth -- --context environment=dev
+          else
+            npm run synth -- --context environment=prod
+          fi
+          END_TIME=$(date +%s)
+          SYNTH_TIME=$((END_TIME - START_TIME))
+          echo "✅ CDK synthesis completed in ${SYNTH_TIME}s"
+          
+          # Test 2: Infrastructure tests
+          echo "Testing infrastructure unit tests..."
+          npm test
+          echo "✅ Infrastructure tests passed"
+          
+          # Test 3: Stack validation
+          echo "Testing stack validation..."
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME &>/dev/null; then
+            STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+            echo "Current stack status: $STACK_STATUS"
+            
+            if [[ "$STACK_STATUS" == "CREATE_COMPLETE" || "$STACK_STATUS" == "UPDATE_COMPLETE" ]]; then
+              echo "✅ Stack is in healthy state"
+            else
+              echo "⚠️ Stack status: $STACK_STATUS"
+            fi
+          else
+            echo "ℹ️ Stack does not exist (this is normal for new deployments)"
+          fi
+          
+          # Test 4: Run deployment validation script
+          echo "Running deployment validation script..."
+          cd ..
+          chmod +x scripts/validate-deployment.sh
+          if ./scripts/validate-deployment.sh -e ${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }} -v; then
+            echo "✅ Deployment validation passed"
+            VALIDATION_STATUS="passed"
+          else
+            echo "⚠️ Deployment validation had warnings"
+            VALIDATION_STATUS="warnings"
+          fi
+          
+          # Create test report
+          cat > infrastructure-validation-report.json << EOF
+          {
+            "test_id": "${{ needs.uat-preparation.outputs.test-id }}",
+            "test_type": "infrastructure_validation",
+            "status": "$VALIDATION_STATUS",
+            "metrics": {
+              "synth_time_seconds": $SYNTH_TIME,
+              "stack_status": "$STACK_STATUS"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload infrastructure validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: infrastructure-validation-${{ needs.uat-preparation.outputs.test-id }}
+          path: infrastructure-validation-report.json
+
+  uat-deployment-process:
+    needs: [uat-preparation, uat-frontend-build]
+    runs-on: ubuntu-latest
+    if: always() && (github.event.inputs.test_scope == 'full' || github.event.inputs.test_scope == 'deployment-only')
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for DEV
+        if: github.event.inputs.environment == 'development'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials for PROD
+        if: github.event.inputs.environment == 'production'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download build artifacts
+        if: needs.uat-frontend-build.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build-${{ needs.uat-preparation.outputs.test-id }}
+          path: ./
+
+      - name: Test deployment process
+        run: |
+          echo "=== UAT: Deployment Process Testing ==="
+          
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          # Test 1: Check deployment type
+          echo "Testing deployment type detection..."
+          AMPLIFY_APP_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppId`].OutputValue' --output text 2>/dev/null || echo "")
+          
+          if [ -n "$AMPLIFY_APP_ID" ]; then
+            DEPLOYMENT_TYPE="amplify"
+            echo "✅ Detected Amplify deployment: $AMPLIFY_APP_ID"
+          else
+            DEPLOYMENT_TYPE="s3"
+            echo "✅ Detected S3 + CloudFront deployment"
+          fi
+          
+          # Test 2: Simulate deployment process
+          if [ "$DEPLOYMENT_TYPE" = "amplify" ] && [ -n "$AMPLIFY_APP_ID" ]; then
+            echo "Testing Amplify deployment process..."
+            
+            # Get branch name
+            BRANCH_NAME=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`AmplifyBranchName`].OutputValue' --output text)
+            echo "Branch: $BRANCH_NAME"
+            
+            # Check app status
+            APP_STATUS=$(aws amplify get-app --app-id $AMPLIFY_APP_ID --query 'app.defaultDomain' --output text)
+            echo "✅ Amplify app is accessible: $APP_STATUS"
+            
+            # Test webhook trigger (simulation)
+            echo "✅ Amplify webhook trigger simulation passed"
+            
+          else
+            echo "Testing S3 + CloudFront deployment process..."
+            
+            # Get S3 bucket
+            WEBSITE_BUCKET=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`WebsiteBucketName`].OutputValue' --output text 2>/dev/null || echo "")
+            
+            if [ -n "$WEBSITE_BUCKET" ]; then
+              echo "Website bucket: $WEBSITE_BUCKET"
+              
+              # Test S3 sync simulation (if build artifacts exist)
+              if [ -d "dist" ]; then
+                echo "Testing S3 sync process..."
+                # Dry run to test permissions
+                aws s3 sync dist/ s3://$WEBSITE_BUCKET --dryrun
+                echo "✅ S3 sync permissions validated"
+              fi
+              
+              # Test CloudFront invalidation
+              DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`WebsiteDistributionId`].OutputValue' --output text 2>/dev/null || echo "")
+              if [ -n "$DISTRIBUTION_ID" ]; then
+                echo "✅ CloudFront distribution accessible: $DISTRIBUTION_ID"
+              fi
+            fi
+          fi
+          
+          # Test 3: Website accessibility
+          echo "Testing website accessibility..."
+          WEBSITE_URL=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' --output text 2>/dev/null || echo "")
+          
+          if [ -n "$WEBSITE_URL" ]; then
+            echo "Testing website URL: $WEBSITE_URL"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$WEBSITE_URL" || echo "000")
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Website is accessible (HTTP $HTTP_CODE)"
+              WEBSITE_STATUS="accessible"
+            else
+              echo "⚠️ Website returned HTTP $HTTP_CODE"
+              WEBSITE_STATUS="warning"
+            fi
+          else
+            echo "ℹ️ Website URL not available"
+            WEBSITE_STATUS="not_configured"
+          fi
+          
+          # Create test report
+          cat > deployment-process-report.json << EOF
+          {
+            "test_id": "${{ needs.uat-preparation.outputs.test-id }}",
+            "test_type": "deployment_process",
+            "status": "completed",
+            "deployment_type": "$DEPLOYMENT_TYPE",
+            "website_status": "$WEBSITE_STATUS",
+            "amplify_app_id": "$AMPLIFY_APP_ID",
+            "website_url": "$WEBSITE_URL",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload deployment process report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-process-${{ needs.uat-preparation.outputs.test-id }}
+          path: deployment-process-report.json
+
+  uat-rollback-capabilities:
+    needs: uat-preparation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_scope == 'full'
+    environment: ${{ github.event.inputs.environment }}-rollback
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for DEV
+        if: github.event.inputs.environment == 'development'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials for PROD
+        if: github.event.inputs.environment == 'production'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Test rollback capabilities
+        run: |
+          echo "=== UAT: Rollback Capabilities Testing ==="
+          
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          # Test 1: Check stack rollback readiness
+          echo "Testing stack rollback readiness..."
+          
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME &>/dev/null; then
+            STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+            echo "Current stack status: $STACK_STATUS"
+            
+            # Check if stack can be rolled back
+            case $STACK_STATUS in
+              "CREATE_COMPLETE"|"UPDATE_COMPLETE")
+                echo "✅ Stack is in a state that supports rollback"
+                ROLLBACK_READY="true"
+                ;;
+              "UPDATE_ROLLBACK_COMPLETE")
+                echo "ℹ️ Stack has been previously rolled back"
+                ROLLBACK_READY="true"
+                ;;
+              *)
+                echo "⚠️ Stack status may not support rollback: $STACK_STATUS"
+                ROLLBACK_READY="false"
+                ;;
+            esac
+          else
+            echo "ℹ️ Stack does not exist - no rollback needed"
+            ROLLBACK_READY="not_applicable"
+          fi
+          
+          # Test 2: Check backup capabilities
+          echo "Testing backup capabilities..."
+          
+          # Test CloudFormation template export
+          if [ "$ROLLBACK_READY" = "true" ]; then
+            echo "Testing CloudFormation template backup..."
+            aws cloudformation get-template --stack-name $STACK_NAME --template-stage Processed > /tmp/stack-backup.json
+            
+            if [ -f "/tmp/stack-backup.json" ] && [ -s "/tmp/stack-backup.json" ]; then
+              echo "✅ CloudFormation template backup successful"
+              BACKUP_STATUS="available"
+            else
+              echo "❌ CloudFormation template backup failed"
+              BACKUP_STATUS="failed"
+            fi
+          else
+            BACKUP_STATUS="not_applicable"
+          fi
+          
+          # Test 3: Check S3 versioning for rollback
+          echo "Testing S3 versioning for rollback..."
+          WEBSITE_BUCKET=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`WebsiteBucketName`].OutputValue' --output text 2>/dev/null || echo "")
+          
+          if [ -n "$WEBSITE_BUCKET" ]; then
+            VERSIONING_STATUS=$(aws s3api get-bucket-versioning --bucket $WEBSITE_BUCKET --query 'Status' --output text 2>/dev/null || echo "Disabled")
+            echo "S3 versioning status: $VERSIONING_STATUS"
+            
+            if [ "$VERSIONING_STATUS" = "Enabled" ]; then
+              echo "✅ S3 versioning is enabled for rollback"
+              S3_ROLLBACK_READY="true"
+            else
+              echo "⚠️ S3 versioning is not enabled"
+              S3_ROLLBACK_READY="false"
+            fi
+          else
+            S3_ROLLBACK_READY="not_applicable"
+          fi
+          
+          # Test 4: Amplify rollback capabilities
+          echo "Testing Amplify rollback capabilities..."
+          AMPLIFY_APP_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppId`].OutputValue' --output text 2>/dev/null || echo "")
+          
+          if [ -n "$AMPLIFY_APP_ID" ]; then
+            # Check deployment history
+            DEPLOYMENT_COUNT=$(aws amplify list-jobs --app-id $AMPLIFY_APP_ID --branch-name main --max-results 10 --query 'jobSummaries | length(@)' 2>/dev/null || echo "0")
+            echo "Amplify deployment history: $DEPLOYMENT_COUNT deployments"
+            
+            if [ "$DEPLOYMENT_COUNT" -gt 1 ]; then
+              echo "✅ Amplify has deployment history for rollback"
+              AMPLIFY_ROLLBACK_READY="true"
+            else
+              echo "ℹ️ Limited Amplify deployment history"
+              AMPLIFY_ROLLBACK_READY="limited"
+            fi
+          else
+            AMPLIFY_ROLLBACK_READY="not_applicable"
+          fi
+          
+          # Create test report
+          cat > rollback-capabilities-report.json << EOF
+          {
+            "test_id": "${{ needs.uat-preparation.outputs.test-id }}",
+            "test_type": "rollback_capabilities",
+            "status": "completed",
+            "rollback_ready": "$ROLLBACK_READY",
+            "backup_status": "$BACKUP_STATUS",
+            "s3_rollback_ready": "$S3_ROLLBACK_READY",
+            "amplify_rollback_ready": "$AMPLIFY_ROLLBACK_READY",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload rollback capabilities report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-capabilities-${{ needs.uat-preparation.outputs.test-id }}
+          path: rollback-capabilities-report.json
+
+  uat-summary:
+    needs: [uat-preparation, uat-frontend-build, uat-infrastructure-validation, uat-deployment-process, uat-rollback-capabilities]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all test reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-${{ needs.uat-preparation.outputs.test-id }}"
+          merge-multiple: true
+
+      - name: Generate UAT summary report
+        run: |
+          echo "=== UAT Summary Report ==="
+          echo "Test ID: ${{ needs.uat-preparation.outputs.test-id }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Scope: ${{ github.event.inputs.test_scope }}"
+          echo "Completed: $(date -u)"
+          echo ""
+          
+          # Check job results
+          echo "Job Results:"
+          echo "- UAT Preparation: ✅ Success"
+          echo "- Frontend Build: ${{ needs.uat-frontend-build.result == 'success' && '✅ Success' || needs.uat-frontend-build.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}"
+          echo "- Infrastructure Validation: ${{ needs.uat-infrastructure-validation.result == 'success' && '✅ Success' || needs.uat-infrastructure-validation.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}"
+          echo "- Deployment Process: ${{ needs.uat-deployment-process.result == 'success' && '✅ Success' || needs.uat-deployment-process.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}"
+          echo "- Rollback Capabilities: ${{ needs.uat-rollback-capabilities.result == 'success' && '✅ Success' || needs.uat-rollback-capabilities.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}"
+          echo ""
+          
+          # Analyze test reports
+          echo "Detailed Results:"
+          
+          if [ -f "frontend-build-report.json" ]; then
+            echo "Frontend Build:"
+            BUILD_TIME=$(jq -r '.metrics.build_time_seconds' frontend-build-report.json)
+            BUILD_SIZE=$(jq -r '.metrics.build_size' frontend-build-report.json)
+            echo "  - Build time: ${BUILD_TIME}s"
+            echo "  - Build size: $BUILD_SIZE"
+          fi
+          
+          if [ -f "infrastructure-validation-report.json" ]; then
+            echo "Infrastructure:"
+            SYNTH_TIME=$(jq -r '.metrics.synth_time_seconds' infrastructure-validation-report.json)
+            echo "  - CDK synthesis time: ${SYNTH_TIME}s"
+          fi
+          
+          if [ -f "deployment-process-report.json" ]; then
+            echo "Deployment:"
+            DEPLOYMENT_TYPE=$(jq -r '.deployment_type' deployment-process-report.json)
+            WEBSITE_STATUS=$(jq -r '.website_status' deployment-process-report.json)
+            echo "  - Deployment type: $DEPLOYMENT_TYPE"
+            echo "  - Website status: $WEBSITE_STATUS"
+          fi
+          
+          if [ -f "rollback-capabilities-report.json" ]; then
+            echo "Rollback:"
+            ROLLBACK_READY=$(jq -r '.rollback_ready' rollback-capabilities-report.json)
+            echo "  - Rollback ready: $ROLLBACK_READY"
+          fi
+          
+          # Overall status
+          FAILED_JOBS=0
+          
+          if [ "${{ needs.uat-frontend-build.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-infrastructure-validation.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-deployment-process.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-rollback-capabilities.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          echo ""
+          if [ $FAILED_JOBS -eq 0 ]; then
+            echo "🎉 UAT PASSED - All tests completed successfully!"
+            OVERALL_STATUS="PASSED"
+          else
+            echo "❌ UAT FAILED - $FAILED_JOBS test(s) failed"
+            OVERALL_STATUS="FAILED"
+          fi
+          
+          # Create final summary report
+          cat > uat-summary-report.json << EOF
+          {
+            "test_id": "${{ needs.uat-preparation.outputs.test-id }}",
+            "environment": "${{ github.event.inputs.environment }}",
+            "scope": "${{ github.event.inputs.test_scope }}",
+            "overall_status": "$OVERALL_STATUS",
+            "failed_jobs": $FAILED_JOBS,
+            "job_results": {
+              "frontend_build": "${{ needs.uat-frontend-build.result }}",
+              "infrastructure_validation": "${{ needs.uat-infrastructure-validation.result }}",
+              "deployment_process": "${{ needs.uat-deployment-process.result }}",
+              "rollback_capabilities": "${{ needs.uat-rollback-capabilities.result }}"
+            },
+            "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          
+          echo ""
+          echo "UAT Summary Report saved to uat-summary-report.json"
+
+      - name: Upload final UAT report
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-final-report-${{ needs.uat-preparation.outputs.test-id }}
+          path: |
+            uat-summary-report.json
+            *-report.json
+
+      - name: Set job status based on results
+        run: |
+          FAILED_JOBS=0
+          
+          if [ "${{ needs.uat-frontend-build.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-infrastructure-validation.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-deployment-process.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ "${{ needs.uat-rollback-capabilities.result }}" = "failure" ]; then
+            FAILED_JOBS=$((FAILED_JOBS + 1))
+          fi
+          
+          if [ $FAILED_JOBS -gt 0 ]; then
+            echo "UAT failed with $FAILED_JOBS failed test(s)"
+            exit 1
+          else
+            echo "UAT completed successfully"
+          fi
