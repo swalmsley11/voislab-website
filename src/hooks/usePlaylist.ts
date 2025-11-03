@@ -3,7 +3,7 @@
  * Manages playlist functionality and track navigation
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { AudioTrackWithUrls } from '../types/audio-track';
 
 interface UsePlaylistState {
