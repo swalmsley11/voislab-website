@@ -14,6 +14,7 @@ const Hero: React.FC<HeroProps> = ({ className = '' }) => {
           <p className="hero-description">
             Crafting unique audio experiences through innovative sound design and music production. 
             Explore a collection of original compositions and discover the artistry behind each track.
+            Now with automated CI/CD deployment!
           </p>
           <div className="hero-cta">
             <button className="cta-button primary">
