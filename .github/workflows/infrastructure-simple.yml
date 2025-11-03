@@ -1,0 +1,121 @@
+name: Infrastructure Deployment (Simplified)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy infrastructure to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - production
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - destroy
+        - diff
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  infrastructure-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: Run infrastructure tests
+        working-directory: infrastructure
+        run: npm test
+
+      - name: Build infrastructure
+        working-directory: infrastructure
+        run: npm run build
+
+      - name: CDK Bootstrap (if needed)
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run bootstrap -- --context environment=dev
+          else
+            npm run bootstrap -- --context environment=prod
+          fi
+
+      - name: CDK Diff
+        if: github.event.inputs.action == 'diff'
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run diff -- --context environment=dev
+          else
+            npm run diff -- --context environment=prod
+          fi
+
+      - name: CDK Deploy
+        if: github.event.inputs.action == 'deploy'
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            npm run deploy:dev -- --require-approval never
+          else
+            npm run deploy:prod -- --require-approval never
+          fi
+
+      - name: CDK Destroy
+        if: github.event.inputs.action == 'destroy'
+        working-directory: infrastructure
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            cdk destroy --context environment=dev --force
+          else
+            cdk destroy --context environment=prod --force
+          fi
+
+      - name: Post-deployment validation
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          
+          echo "Validating deployment..."
+          STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+          echo "Final stack status: $STACK_STATUS"
+          
+          if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
+            echo "❌ Deployment failed with status: $STACK_STATUS"
+            exit 1
+          fi
+          
+          echo "✅ Infrastructure deployment completed successfully"
+
+      - name: Output stack information
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          STACK_NAME="VoislabWebsite-${{ github.event.inputs.environment == 'development' && 'dev' || 'prod' }}"
+          echo "=== Stack Outputs ==="
+          aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs' --output table
