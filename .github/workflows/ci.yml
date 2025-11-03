@@ -119,6 +119,30 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Debug GitHub Secrets
+        run: |
+          echo "Checking if GitHub secrets are available..."
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "✅ AWS_ACCESS_KEY_ID secret exists"
+          else
+            echo "❌ AWS_ACCESS_KEY_ID secret is missing"
+            exit 1
+          fi
+          
+          if [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "✅ AWS_SECRET_ACCESS_KEY secret exists"
+          else
+            echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
+            exit 1
+          fi
+          
+          if [ -n "${{ secrets.AWS_REGION }}" ]; then
+            echo "✅ AWS_REGION secret exists: ${{ secrets.AWS_REGION }}"
+          else
+            echo "❌ AWS_REGION secret is missing"
+            exit 1
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -126,12 +150,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Verify AWS Configuration
+        run: |
+          echo "Verifying AWS credentials are properly set..."
+          echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:10}..."
+          echo "AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
+          
+          echo "Testing AWS CLI..."
+          aws --version
+          aws configure list
+
       - name: Get AWS Account ID
         id: aws-account
         run: |
+          echo "Getting AWS Account ID..."
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
-          echo "AWS Account ID: $ACCOUNT_ID"
+          echo "✅ AWS Account ID: $ACCOUNT_ID"
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
