@@ -9,13 +9,15 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "deploy:dev": "cdk deploy --profile default --context environment=dev",
-    "deploy:prod": "cdk deploy --profile default --context environment=prod",
+    "deploy:dev": "cdk deploy --context environment=dev",
+    "deploy:prod": "cdk deploy --context environment=prod",
     "deploy:dev:amplify": "cdk deploy --profile default --context environment=dev --context githubRepository=voislab/voislab-website",
     "deploy:prod:amplify": "cdk deploy --profile default --context environment=prod --context githubRepository=voislab/voislab-website --context domainName=voislab.com --context hostedZoneId=Z1234567890ABC",
     "diff": "cdk diff",
     "synth": "cdk synth",
-    "bootstrap": "cdk bootstrap"
+    "bootstrap": "cdk bootstrap",
+    "bootstrap:dev": "cdk bootstrap --context environment=dev",
+    "bootstrap:prod": "cdk bootstrap --context environment=prod"
   },
   "devDependencies": {
     "@types/jest": "^29.4.0",
