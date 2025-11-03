@@ -3,11 +3,11 @@
  * Handles all DynamoDB operations for audio track metadata
  */
 
-import { 
-  ScanCommand, 
-  GetItemCommand, 
+import {
+  ScanCommand,
+  GetItemCommand,
   QueryCommand,
-  DynamoDBServiceException 
+  DynamoDBServiceException,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { dynamoDBClient, AWS_CONFIG } from './aws-config';
@@ -47,10 +47,12 @@ export class DynamoDBService {
    */
   private isRetryableError(error: unknown): boolean {
     if (error instanceof DynamoDBServiceException) {
-      return error.name === 'ProvisionedThroughputExceededException' ||
-             error.name === 'ThrottlingException' ||
-             error.name === 'InternalServerError' ||
-             error.$retryable?.throttling === true;
+      return (
+        error.name === 'ProvisionedThroughputExceededException' ||
+        error.name === 'ThrottlingException' ||
+        error.name === 'InternalServerError' ||
+        error.$retryable?.throttling === true
+      );
     }
     return false;
   }
@@ -59,7 +61,7 @@ export class DynamoDBService {
    * Delay utility for retry logic
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -73,18 +75,20 @@ export class DynamoDBService {
         });
 
         const response = await dynamoDBClient.send(command);
-        
+
         if (!response.Items) {
           return [];
         }
 
-        return response.Items.map(item => {
+        return response.Items.map((item) => {
           const unmarshalled = unmarshall(item);
           return this.mapDynamoItemToAudioTrack(unmarshalled);
         });
       } catch (error) {
         console.error('Error fetching all tracks:', error);
-        throw new Error(`Failed to fetch tracks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to fetch tracks: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   }
@@ -101,7 +105,7 @@ export class DynamoDBService {
         });
 
         const response = await dynamoDBClient.send(command);
-        
+
         if (!response.Item) {
           return null;
         }
@@ -110,7 +114,9 @@ export class DynamoDBService {
         return this.mapDynamoItemToAudioTrack(unmarshalled);
       } catch (error) {
         console.error(`Error fetching track ${trackId}:`, error);
-        throw new Error(`Failed to fetch track: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to fetch track: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   }
@@ -132,20 +138,20 @@ export class DynamoDBService {
         });
 
         const response = await dynamoDBClient.send(command);
-        
+
         if (!response.Items) {
           return [];
         }
 
-        return response.Items.map(item => {
+        return response.Items.map((item) => {
           const unmarshalled = unmarshall(item);
           return this.mapDynamoItemToAudioTrack(unmarshalled);
         });
       } catch (error) {
         console.error(`Error fetching tracks by genre ${genre}:`, error);
         // If GSI doesn't exist, fall back to scan with filter
-        return this.getAllTracks().then(tracks => 
-          tracks.filter(track => track.genre === genre)
+        return this.getAllTracks().then((tracks) =>
+          tracks.filter((track) => track.genre === genre)
         );
       }
     });
@@ -178,7 +184,7 @@ export class DynamoDBService {
         TableName: this.tableName,
         Limit: 1,
       });
-      
+
       await dynamoDBClient.send(command);
       return true;
     } catch (error) {

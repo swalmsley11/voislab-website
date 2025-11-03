@@ -17,14 +17,20 @@ export interface PlatformConfig {
 export interface StreamingPlatformManager {
   platforms: Record<StreamingPlatform['platform'], PlatformConfig>;
   getActivePlatforms: () => PlatformConfig[];
-  generateSearchUrl: (platform: StreamingPlatform['platform'], query: string) => string;
-  validateUrl: (platform: StreamingPlatform['platform'], url: string) => boolean;
+  generateSearchUrl: (
+    platform: StreamingPlatform['platform'],
+    query: string
+  ) => string;
+  validateUrl: (
+    platform: StreamingPlatform['platform'],
+    url: string
+  ) => boolean;
   formatPlatformLinks: (links: StreamingPlatform[]) => StreamingPlatform[];
 }
 
 class StreamingPlatformsService implements StreamingPlatformManager {
   public platforms: Record<StreamingPlatform['platform'], PlatformConfig> = {
-    'spotify': {
+    spotify: {
       name: 'Spotify',
       baseUrl: 'https://open.spotify.com',
       searchUrl: 'https://open.spotify.com/search',
@@ -40,7 +46,7 @@ class StreamingPlatformsService implements StreamingPlatformManager {
       icon: '🍎',
       isActive: true,
     },
-    'soundcloud': {
+    soundcloud: {
       name: 'SoundCloud',
       baseUrl: 'https://soundcloud.com',
       searchUrl: 'https://soundcloud.com/search',
@@ -48,7 +54,7 @@ class StreamingPlatformsService implements StreamingPlatformManager {
       icon: '☁️',
       isActive: true,
     },
-    'youtube': {
+    youtube: {
       name: 'YouTube',
       baseUrl: 'https://youtube.com',
       searchUrl: 'https://youtube.com/results',
@@ -56,7 +62,7 @@ class StreamingPlatformsService implements StreamingPlatformManager {
       icon: '📺',
       isActive: true,
     },
-    'bandcamp': {
+    bandcamp: {
       name: 'Bandcamp',
       baseUrl: 'https://bandcamp.com',
       searchUrl: 'https://bandcamp.com/search',
@@ -70,20 +76,25 @@ class StreamingPlatformsService implements StreamingPlatformManager {
    * Get all active platforms
    */
   getActivePlatforms(): PlatformConfig[] {
-    return Object.values(this.platforms).filter(platform => platform.isActive);
+    return Object.values(this.platforms).filter(
+      (platform) => platform.isActive
+    );
   }
 
   /**
    * Generate search URL for a platform
    */
-  generateSearchUrl(platform: StreamingPlatform['platform'], query: string): string {
+  generateSearchUrl(
+    platform: StreamingPlatform['platform'],
+    query: string
+  ): string {
     const config = this.platforms[platform];
     if (!config || !config.searchUrl) {
       return '';
     }
 
     const encodedQuery = encodeURIComponent(query);
-    
+
     switch (platform) {
       case 'spotify':
         return `${config.searchUrl}/${encodedQuery}`;
@@ -109,19 +120,23 @@ class StreamingPlatformsService implements StreamingPlatformManager {
 
     try {
       const urlObj = new URL(url);
-      
+
       switch (platform) {
         case 'spotify':
-          return urlObj.hostname === 'open.spotify.com' || 
-                 urlObj.hostname === 'spotify.com';
+          return (
+            urlObj.hostname === 'open.spotify.com' ||
+            urlObj.hostname === 'spotify.com'
+          );
         case 'apple-music':
           return urlObj.hostname === 'music.apple.com';
         case 'soundcloud':
           return urlObj.hostname === 'soundcloud.com';
         case 'youtube':
-          return urlObj.hostname === 'youtube.com' || 
-                 urlObj.hostname === 'www.youtube.com' ||
-                 urlObj.hostname === 'youtu.be';
+          return (
+            urlObj.hostname === 'youtube.com' ||
+            urlObj.hostname === 'www.youtube.com' ||
+            urlObj.hostname === 'youtu.be'
+          );
         case 'bandcamp':
           return urlObj.hostname.includes('bandcamp.com');
         default:
@@ -137,23 +152,23 @@ class StreamingPlatformsService implements StreamingPlatformManager {
    */
   formatPlatformLinks(links: StreamingPlatform[]): StreamingPlatform[] {
     return links
-      .filter(link => {
+      .filter((link) => {
         // Validate URL format
         if (!this.validateUrl(link.platform, link.url)) {
           console.warn(`Invalid URL for ${link.platform}: ${link.url}`);
           return false;
         }
-        
+
         // Check if platform is active
         const config = this.platforms[link.platform];
         if (!config || !config.isActive) {
           console.warn(`Platform ${link.platform} is not active`);
           return false;
         }
-        
+
         return true;
       })
-      .map(link => ({
+      .map((link) => ({
         ...link,
         displayName: link.displayName || this.platforms[link.platform]?.name,
       }));
@@ -162,7 +177,9 @@ class StreamingPlatformsService implements StreamingPlatformManager {
   /**
    * Get platform configuration
    */
-  getPlatformConfig(platform: StreamingPlatform['platform']): PlatformConfig | null {
+  getPlatformConfig(
+    platform: StreamingPlatform['platform']
+  ): PlatformConfig | null {
     return this.platforms[platform] || null;
   }
 
@@ -170,7 +187,7 @@ class StreamingPlatformsService implements StreamingPlatformManager {
    * Update platform configuration
    */
   updatePlatformConfig(
-    platform: StreamingPlatform['platform'], 
+    platform: StreamingPlatform['platform'],
     updates: Partial<PlatformConfig>
   ): void {
     if (this.platforms[platform]) {
@@ -184,7 +201,10 @@ class StreamingPlatformsService implements StreamingPlatformManager {
   /**
    * Enable/disable a platform
    */
-  setPlatformActive(platform: StreamingPlatform['platform'], isActive: boolean): void {
+  setPlatformActive(
+    platform: StreamingPlatform['platform'],
+    isActive: boolean
+  ): void {
     if (this.platforms[platform]) {
       this.platforms[platform].isActive = isActive;
     }
@@ -195,15 +215,15 @@ class StreamingPlatformsService implements StreamingPlatformManager {
    */
   getSuggestedPlatforms(genre?: string): StreamingPlatform['platform'][] {
     // const allPlatforms = Object.keys(this.platforms) as StreamingPlatform['platform'][];
-    
+
     // Basic genre-based suggestions
     const genrePreferences: Record<string, StreamingPlatform['platform'][]> = {
-      'electronic': ['spotify', 'soundcloud', 'bandcamp'],
-      'ambient': ['bandcamp', 'spotify', 'apple-music'],
-      'experimental': ['bandcamp', 'soundcloud', 'youtube'],
-      'pop': ['spotify', 'apple-music', 'youtube'],
-      'rock': ['spotify', 'apple-music', 'youtube'],
-      'indie': ['bandcamp', 'spotify', 'soundcloud'],
+      electronic: ['spotify', 'soundcloud', 'bandcamp'],
+      ambient: ['bandcamp', 'spotify', 'apple-music'],
+      experimental: ['bandcamp', 'soundcloud', 'youtube'],
+      pop: ['spotify', 'apple-music', 'youtube'],
+      rock: ['spotify', 'apple-music', 'youtube'],
+      indie: ['bandcamp', 'spotify', 'soundcloud'],
     };
 
     if (genre && genrePreferences[genre.toLowerCase()]) {
@@ -219,13 +239,15 @@ class StreamingPlatformsService implements StreamingPlatformManager {
 export const streamingPlatformsService = new StreamingPlatformsService();
 
 // Export utility functions
-export const formatStreamingLinks = (links: StreamingPlatform[]): StreamingPlatform[] => {
+export const formatStreamingLinks = (
+  links: StreamingPlatform[]
+): StreamingPlatform[] => {
   return streamingPlatformsService.formatPlatformLinks(links);
 };
 
 export const generatePlatformSearchUrl = (
-  platform: StreamingPlatform['platform'], 
-  trackTitle: string, 
+  platform: StreamingPlatform['platform'],
+  trackTitle: string,
   artistName?: string
 ): string => {
   const query = artistName ? `${trackTitle} ${artistName}` : trackTitle;

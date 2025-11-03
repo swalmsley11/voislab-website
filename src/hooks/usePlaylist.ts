@@ -67,47 +67,56 @@ export const usePlaylist = (): UsePlaylistReturn => {
    */
   const generateShuffledIndices = useCallback((length: number): number[] => {
     const indices = Array.from({ length }, (_, i) => i);
-    
+
     // Fisher-Yates shuffle
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
-    
+
     return indices;
   }, []);
 
   /**
    * Set playlist
    */
-  const setPlaylist = useCallback((tracks: AudioTrackWithUrls[]) => {
-    setPlaylistState(tracks);
-    setCurrentIndex(tracks.length > 0 ? 0 : -1);
-    
-    if (isShuffled) {
-      setShuffledIndices(generateShuffledIndices(tracks.length));
-    }
-  }, [isShuffled, generateShuffledIndices]);
+  const setPlaylist = useCallback(
+    (tracks: AudioTrackWithUrls[]) => {
+      setPlaylistState(tracks);
+      setCurrentIndex(tracks.length > 0 ? 0 : -1);
+
+      if (isShuffled) {
+        setShuffledIndices(generateShuffledIndices(tracks.length));
+      }
+    },
+    [isShuffled, generateShuffledIndices]
+  );
 
   /**
    * Play specific track
    */
-  const playTrack = useCallback((track: AudioTrackWithUrls) => {
-    const index = playlist.findIndex(t => t.id === track.id);
-    if (index !== -1) {
-      setCurrentIndex(index);
-    }
-  }, [playlist]);
+  const playTrack = useCallback(
+    (track: AudioTrackWithUrls) => {
+      const index = playlist.findIndex((t) => t.id === track.id);
+      if (index !== -1) {
+        setCurrentIndex(index);
+      }
+    },
+    [playlist]
+  );
 
   /**
    * Play track by ID
    */
-  const playTrackById = useCallback((id: string) => {
-    const track = playlist.find(t => t.id === id);
-    if (track) {
-      playTrack(track);
-    }
-  }, [playlist, playTrack]);
+  const playTrackById = useCallback(
+    (id: string) => {
+      const track = playlist.find((t) => t.id === id);
+      if (track) {
+        playTrack(track);
+      }
+    },
+    [playlist, playTrack]
+  );
 
   /**
    * Get next index based on shuffle and repeat settings
@@ -118,7 +127,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
     if (isShuffled) {
       const currentShuffledIndex = shuffledIndices.indexOf(currentIndex);
       const nextShuffledIndex = currentShuffledIndex + 1;
-      
+
       if (nextShuffledIndex < shuffledIndices.length) {
         return shuffledIndices[nextShuffledIndex];
       } else if (isRepeating) {
@@ -128,7 +137,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
       }
     } else {
       const nextIndex = currentIndex + 1;
-      
+
       if (nextIndex < playlist.length) {
         return nextIndex;
       } else if (isRepeating) {
@@ -148,7 +157,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
     if (isShuffled) {
       const currentShuffledIndex = shuffledIndices.indexOf(currentIndex);
       const prevShuffledIndex = currentShuffledIndex - 1;
-      
+
       if (prevShuffledIndex >= 0) {
         return shuffledIndices[prevShuffledIndex];
       } else if (isRepeating) {
@@ -158,7 +167,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
       }
     } else {
       const prevIndex = currentIndex - 1;
-      
+
       if (prevIndex >= 0) {
         return prevIndex;
       } else if (isRepeating) {
@@ -199,7 +208,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
   const toggleShuffle = useCallback(() => {
     const newShuffled = !isShuffled;
     setIsShuffled(newShuffled);
-    
+
     if (newShuffled) {
       setShuffledIndices(generateShuffledIndices(playlist.length));
     }
@@ -224,43 +233,49 @@ export const usePlaylist = (): UsePlaylistReturn => {
   /**
    * Add track to playlist
    */
-  const addToPlaylist = useCallback((track: AudioTrackWithUrls) => {
-    setPlaylistState(prev => {
-      const exists = prev.some(t => t.id === track.id);
-      if (exists) return prev;
-      
-      const newPlaylist = [...prev, track];
-      
-      // Update shuffled indices if shuffle is enabled
-      if (isShuffled) {
-        setShuffledIndices(generateShuffledIndices(newPlaylist.length));
-      }
-      
-      return newPlaylist;
-    });
-  }, [isShuffled, generateShuffledIndices]);
+  const addToPlaylist = useCallback(
+    (track: AudioTrackWithUrls) => {
+      setPlaylistState((prev) => {
+        const exists = prev.some((t) => t.id === track.id);
+        if (exists) return prev;
+
+        const newPlaylist = [...prev, track];
+
+        // Update shuffled indices if shuffle is enabled
+        if (isShuffled) {
+          setShuffledIndices(generateShuffledIndices(newPlaylist.length));
+        }
+
+        return newPlaylist;
+      });
+    },
+    [isShuffled, generateShuffledIndices]
+  );
 
   /**
    * Remove track from playlist
    */
-  const removeFromPlaylist = useCallback((trackId: string) => {
-    setPlaylistState(prev => {
-      const newPlaylist = prev.filter(t => t.id !== trackId);
-      const removedIndex = prev.findIndex(t => t.id === trackId);
-      
-      // Adjust current index if necessary
-      if (removedIndex !== -1 && removedIndex <= currentIndex) {
-        setCurrentIndex(Math.max(0, currentIndex - 1));
-      }
-      
-      // Update shuffled indices if shuffle is enabled
-      if (isShuffled) {
-        setShuffledIndices(generateShuffledIndices(newPlaylist.length));
-      }
-      
-      return newPlaylist;
-    });
-  }, [currentIndex, isShuffled, generateShuffledIndices]);
+  const removeFromPlaylist = useCallback(
+    (trackId: string) => {
+      setPlaylistState((prev) => {
+        const newPlaylist = prev.filter((t) => t.id !== trackId);
+        const removedIndex = prev.findIndex((t) => t.id === trackId);
+
+        // Adjust current index if necessary
+        if (removedIndex !== -1 && removedIndex <= currentIndex) {
+          setCurrentIndex(Math.max(0, currentIndex - 1));
+        }
+
+        // Update shuffled indices if shuffle is enabled
+        if (isShuffled) {
+          setShuffledIndices(generateShuffledIndices(newPlaylist.length));
+        }
+
+        return newPlaylist;
+      });
+    },
+    [currentIndex, isShuffled, generateShuffledIndices]
+  );
 
   return {
     playlist,

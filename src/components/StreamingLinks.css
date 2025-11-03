@@ -82,16 +82,16 @@
   .streaming-links__list {
     gap: 0.5rem;
   }
-  
+
   .streaming-links__link {
     padding: 0.5rem;
     font-size: 0.75rem;
   }
-  
+
   .streaming-links__name {
     display: none;
   }
-  
+
   .streaming-links__icon {
     font-size: 1.125rem;
   }

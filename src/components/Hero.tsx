@@ -12,17 +12,14 @@ const Hero: React.FC<HeroProps> = ({ className = '' }) => {
         <div className="hero-content">
           <h2 className="hero-title">Welcome to VoisLab</h2>
           <p className="hero-description">
-            Crafting unique audio experiences through innovative sound design and music production. 
-            Explore a collection of original compositions and discover the artistry behind each track.
-            Now with automated CI/CD deployment!
+            Crafting unique audio experiences through innovative sound design
+            and music production. Explore a collection of original compositions
+            and discover the artistry behind each track. Now with automated
+            CI/CD deployment!
           </p>
           <div className="hero-cta">
-            <button className="cta-button primary">
-              Listen Now
-            </button>
-            <button className="cta-button secondary">
-              Learn More
-            </button>
+            <button className="cta-button primary">Listen Now</button>
+            <button className="cta-button secondary">Learn More</button>
           </div>
         </div>
         <div className="hero-visual">

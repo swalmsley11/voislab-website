@@ -3,10 +3,7 @@
  * Handles S3 operations for secure audio URL generation and media access
  */
 
-import { 
-  HeadObjectCommand,
-  S3ServiceException 
-} from '@aws-sdk/client-s3';
+import { HeadObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import { s3Client, AWS_CONFIG } from './aws-config';
 
 export class S3Service {
@@ -47,10 +44,12 @@ export class S3Service {
    */
   private isRetryableError(error: unknown): boolean {
     if (error instanceof S3ServiceException) {
-      return error.name === 'InternalError' ||
-             error.name === 'ServiceUnavailable' ||
-             error.name === 'SlowDown' ||
-             error.$retryable?.throttling === true;
+      return (
+        error.name === 'InternalError' ||
+        error.name === 'ServiceUnavailable' ||
+        error.name === 'SlowDown' ||
+        error.$retryable?.throttling === true
+      );
     }
     return false;
   }
@@ -59,7 +58,7 @@ export class S3Service {
    * Delay utility for retry logic
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -79,7 +78,9 @@ export class S3Service {
         return `https://${this.bucketName}.s3.amazonaws.com/${key}`;
       } catch (error) {
         console.error(`Error generating secure URL for ${key}:`, error);
-        throw new Error(`Failed to generate secure URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to generate secure URL: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   }
@@ -102,7 +103,9 @@ export class S3Service {
           return false;
         }
         console.error(`Error checking file existence for ${key}:`, error);
-        throw new Error(`Failed to check file existence: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to check file existence: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   }
@@ -123,7 +126,7 @@ export class S3Service {
         });
 
         const response = await s3Client.send(command);
-        
+
         return {
           contentLength: response.ContentLength,
           contentType: response.ContentType,
@@ -134,7 +137,9 @@ export class S3Service {
           return null;
         }
         console.error(`Error getting file metadata for ${key}:`, error);
-        throw new Error(`Failed to get file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to get file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   }
@@ -149,7 +154,7 @@ export class S3Service {
   }> {
     const formats = ['mp3', 'wav', 'ogg'];
     const urls: string[] = [];
-    
+
     for (const format of formats) {
       const key = `${baseKey}.${format}`;
       try {
@@ -182,7 +187,7 @@ export class S3Service {
         Bucket: this.bucketName,
         Key: 'health-check', // This file doesn't need to exist
       });
-      
+
       await s3Client.send(command);
       return true;
     } catch (error) {

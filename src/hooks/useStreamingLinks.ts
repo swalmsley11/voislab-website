@@ -5,10 +5,10 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { StreamingPlatform, AudioTrack } from '../types/audio-track';
-import { 
-  streamingPlatformsService, 
-  formatStreamingLinks, 
-  generatePlatformSearchUrl 
+import {
+  streamingPlatformsService,
+  formatStreamingLinks,
+  generatePlatformSearchUrl,
 } from '../services/streaming-platforms';
 
 interface UseStreamingLinksOptions {
@@ -19,7 +19,10 @@ interface UseStreamingLinksOptions {
 interface UseStreamingLinksReturn {
   formatLinks: (links: StreamingPlatform[]) => StreamingPlatform[];
   generateSearchLinks: (track: AudioTrack) => StreamingPlatform[];
-  validateLink: (platform: StreamingPlatform['platform'], url: string) => boolean;
+  validateLink: (
+    platform: StreamingPlatform['platform'],
+    url: string
+  ) => boolean;
   getActivePlatforms: () => string[];
   getSuggestedPlatforms: (genre?: string) => StreamingPlatform['platform'][];
 }
@@ -32,49 +35,60 @@ export const useStreamingLinks = (
   /**
    * Format and validate streaming links
    */
-  const formatLinks = useCallback((links: StreamingPlatform[]): StreamingPlatform[] => {
-    return formatStreamingLinks(links);
-  }, []);
+  const formatLinks = useCallback(
+    (links: StreamingPlatform[]): StreamingPlatform[] => {
+      return formatStreamingLinks(links);
+    },
+    []
+  );
 
   /**
    * Generate search links for platforms where the track isn't directly available
    */
-  const generateSearchLinks = useCallback((track: AudioTrack): StreamingPlatform[] => {
-    if (!autoGenerateSearchLinks) return [];
+  const generateSearchLinks = useCallback(
+    (track: AudioTrack): StreamingPlatform[] => {
+      if (!autoGenerateSearchLinks) return [];
 
-    const existingPlatforms = new Set(
-      (track.streamingLinks || []).map(link => link.platform)
-    );
+      const existingPlatforms = new Set(
+        (track.streamingLinks || []).map((link) => link.platform)
+      );
 
-    const suggestedPlatforms = streamingPlatformsService.getSuggestedPlatforms(track.genre);
-    
-    const searchLinks: StreamingPlatform[] = [];
+      const suggestedPlatforms =
+        streamingPlatformsService.getSuggestedPlatforms(track.genre);
 
-    for (const platform of suggestedPlatforms) {
-      if (!existingPlatforms.has(platform)) {
-        const searchUrl = generatePlatformSearchUrl(platform, track.title, artistName);
-        if (searchUrl) {
-          searchLinks.push({
+      const searchLinks: StreamingPlatform[] = [];
+
+      for (const platform of suggestedPlatforms) {
+        if (!existingPlatforms.has(platform)) {
+          const searchUrl = generatePlatformSearchUrl(
             platform,
-            url: searchUrl,
-            displayName: `Search on ${streamingPlatformsService.platforms[platform]?.name}`,
-          });
+            track.title,
+            artistName
+          );
+          if (searchUrl) {
+            searchLinks.push({
+              platform,
+              url: searchUrl,
+              displayName: `Search on ${streamingPlatformsService.platforms[platform]?.name}`,
+            });
+          }
         }
       }
-    }
 
-    return searchLinks;
-  }, [autoGenerateSearchLinks, artistName]);
+      return searchLinks;
+    },
+    [autoGenerateSearchLinks, artistName]
+  );
 
   /**
    * Validate a streaming platform URL
    */
-  const validateLink = useCallback((
-    platform: StreamingPlatform['platform'], 
-    url: string
-  ): boolean => {
-    return streamingPlatformsService.validateUrl(platform, url);
-  }, []);
+  const validateLink = useCallback(
+    (platform: StreamingPlatform['platform'], url: string): boolean => {
+      return streamingPlatformsService.validateUrl(platform, url);
+    },
+    []
+  );
 
   /**
    * Get list of active platform names
@@ -82,15 +96,18 @@ export const useStreamingLinks = (
   const getActivePlatforms = useCallback((): string[] => {
     return streamingPlatformsService
       .getActivePlatforms()
-      .map(config => config.name);
+      .map((config) => config.name);
   }, []);
 
   /**
    * Get suggested platforms for a genre
    */
-  const getSuggestedPlatforms = useCallback((genre?: string): StreamingPlatform['platform'][] => {
-    return streamingPlatformsService.getSuggestedPlatforms(genre);
-  }, []);
+  const getSuggestedPlatforms = useCallback(
+    (genre?: string): StreamingPlatform['platform'][] => {
+      return streamingPlatformsService.getSuggestedPlatforms(genre);
+    },
+    []
+  );
 
   return {
     formatLinks,
@@ -109,8 +126,10 @@ export const useTrackStreamingLinks = (
   options: UseStreamingLinksOptions = {}
 ) => {
   const { formatLinks, generateSearchLinks } = useStreamingLinks(options);
-  
-  const [additionalLinks, setAdditionalLinks] = useState<StreamingPlatform[]>([]);
+
+  const [additionalLinks, setAdditionalLinks] = useState<StreamingPlatform[]>(
+    []
+  );
 
   /**
    * All available links (direct + search links)
@@ -120,7 +139,7 @@ export const useTrackStreamingLinks = (
 
     const directLinks = formatLinks(track.streamingLinks || []);
     const searchLinks = generateSearchLinks(track);
-    
+
     return [...directLinks, ...searchLinks, ...additionalLinks];
   }, [track, formatLinks, generateSearchLinks, additionalLinks]);
 
@@ -135,18 +154,23 @@ export const useTrackStreamingLinks = (
   /**
    * Add a custom streaming link
    */
-  const addLink = useCallback((link: StreamingPlatform) => {
-    const formattedLinks = formatLinks([link]);
-    if (formattedLinks.length > 0) {
-      setAdditionalLinks(prev => [...prev, formattedLinks[0]]);
-    }
-  }, [formatLinks]);
+  const addLink = useCallback(
+    (link: StreamingPlatform) => {
+      const formattedLinks = formatLinks([link]);
+      if (formattedLinks.length > 0) {
+        setAdditionalLinks((prev) => [...prev, formattedLinks[0]]);
+      }
+    },
+    [formatLinks]
+  );
 
   /**
    * Remove a streaming link
    */
   const removeLink = useCallback((platform: StreamingPlatform['platform']) => {
-    setAdditionalLinks(prev => prev.filter(link => link.platform !== platform));
+    setAdditionalLinks((prev) =>
+      prev.filter((link) => link.platform !== platform)
+    );
   }, []);
 
   /**

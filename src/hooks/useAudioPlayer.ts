@@ -24,7 +24,9 @@ interface UseAudioPlayerReturn extends AudioPlayerState {
   togglePlayPause: () => Promise<void>;
 }
 
-export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPlayerReturn => {
+export const useAudioPlayer = (
+  options: UseAudioPlayerOptions = {}
+): UseAudioPlayerReturn => {
   const {
     autoPlay = false,
     volume: initialVolume = 0.8,
@@ -33,7 +35,7 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
   } = options;
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  
+
   const [state, setState] = useState<AudioPlayerState>({
     currentTrack: null,
     isPlaying: false,
@@ -48,53 +50,59 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
    * Update state helper
    */
   const updateState = useCallback((updates: Partial<AudioPlayerState>) => {
-    setState(prev => ({ ...prev, ...updates }));
+    setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
   /**
    * Handle audio errors
    */
-  const handleError = useCallback((errorType: AudioError['type'], message: string) => {
-    const error: AudioError = {
-      type: errorType,
-      message,
-      trackId: state.currentTrack?.id,
-    };
-    
-    updateState({ 
-      error, 
-      isLoading: false, 
-      isPlaying: false 
-    });
-    
-    onError?.(error);
-  }, [state.currentTrack?.id, onError, updateState]);
+  const handleError = useCallback(
+    (errorType: AudioError['type'], message: string) => {
+      const error: AudioError = {
+        type: errorType,
+        message,
+        trackId: state.currentTrack?.id,
+      };
+
+      updateState({
+        error,
+        isLoading: false,
+        isPlaying: false,
+      });
+
+      onError?.(error);
+    },
+    [state.currentTrack?.id, onError, updateState]
+  );
 
   /**
    * Load a new track
    */
-  const loadTrack = useCallback((track: AudioTrack, secureUrl?: string) => {
-    if (!audioRef.current) return;
+  const loadTrack = useCallback(
+    (track: AudioTrack, secureUrl?: string) => {
+      if (!audioRef.current) return;
 
-    updateState({
-      currentTrack: track,
-      isLoading: true,
-      error: null,
-      isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-    });
+      updateState({
+        currentTrack: track,
+        isLoading: true,
+        error: null,
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0,
+      });
 
-    const audio = audioRef.current;
-    const urlToUse = secureUrl || track.fileUrl;
-    
-    // Set the audio source
-    audio.src = urlToUse;
-    audio.volume = state.volume;
+      const audio = audioRef.current;
+      const urlToUse = secureUrl || track.fileUrl;
 
-    // Load the audio
-    audio.load();
-  }, [state.volume, updateState]);
+      // Set the audio source
+      audio.src = urlToUse;
+      audio.volume = state.volume;
+
+      // Load the audio
+      audio.load();
+    },
+    [state.volume, updateState]
+  );
 
   /**
    * Play audio
@@ -117,7 +125,7 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
    */
   const pause = useCallback(() => {
     if (!audioRef.current) return;
-    
+
     audioRef.current.pause();
     updateState({ isPlaying: false });
   }, [updateState]);
@@ -127,36 +135,45 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
    */
   const stop = useCallback(() => {
     if (!audioRef.current) return;
-    
+
     audioRef.current.pause();
     audioRef.current.currentTime = 0;
-    updateState({ 
-      isPlaying: false, 
-      currentTime: 0 
+    updateState({
+      isPlaying: false,
+      currentTime: 0,
     });
   }, [updateState]);
 
   /**
    * Seek to specific time
    */
-  const seek = useCallback((time: number) => {
-    if (!audioRef.current) return;
-    
-    audioRef.current.currentTime = Math.max(0, Math.min(time, state.duration));
-  }, [state.duration]);
+  const seek = useCallback(
+    (time: number) => {
+      if (!audioRef.current) return;
+
+      audioRef.current.currentTime = Math.max(
+        0,
+        Math.min(time, state.duration)
+      );
+    },
+    [state.duration]
+  );
 
   /**
    * Set volume
    */
-  const setVolume = useCallback((newVolume: number) => {
-    const clampedVolume = Math.max(0, Math.min(1, newVolume));
-    
-    if (audioRef.current) {
-      audioRef.current.volume = clampedVolume;
-    }
-    
-    updateState({ volume: clampedVolume });
-  }, [updateState]);
+  const setVolume = useCallback(
+    (newVolume: number) => {
+      const clampedVolume = Math.max(0, Math.min(1, newVolume));
+
+      if (audioRef.current) {
+        audioRef.current.volume = clampedVolume;
+      }
+
+      updateState({ volume: clampedVolume });
+    },
+    [updateState]
+  );
 
   /**
    * Toggle play/pause
@@ -181,11 +198,11 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
     };
 
     const handleCanPlay = () => {
-      updateState({ 
+      updateState({
         isLoading: false,
         duration: audio.duration || 0,
       });
-      
+
       if (autoPlay && state.currentTrack) {
         play();
       }
@@ -196,9 +213,9 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
     };
 
     const handleEnded = () => {
-      updateState({ 
-        isPlaying: false, 
-        currentTime: 0 
+      updateState({
+        isPlaying: false,
+        currentTime: 0,
       });
       onTrackEnd?.();
     };
@@ -253,7 +270,14 @@ export const useAudioPlayer = (options: UseAudioPlayerOptions = {}): UseAudioPla
       audio.removeEventListener('error', handleAudioError);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
-  }, [autoPlay, state.currentTrack, play, onTrackEnd, handleError, updateState]);
+  }, [
+    autoPlay,
+    state.currentTrack,
+    play,
+    onTrackEnd,
+    handleError,
+    updateState,
+  ]);
 
   return {
     ...state,

@@ -204,13 +204,14 @@ describe('VoisLab Website Infrastructure', () => {
         FunctionName: 'voislab-audio-processor-test',
         Runtime: 'python3.11',
         Handler: 'index.handler',
-        Timeout: 300,
-        MemorySize: 512,
+        Timeout: 600,
+        MemorySize: 1024,
         Environment: {
           Variables: {
             METADATA_TABLE_NAME: Match.anyValue(),
             MEDIA_BUCKET_NAME: Match.anyValue(),
             UPLOAD_BUCKET_NAME: Match.anyValue(),
+            ENVIRONMENT: 'test',
           },
         },
       });
@@ -322,8 +323,27 @@ describe('VoisLab Website Infrastructure', () => {
 
   describe('CloudFront Distribution', () => {
     test('creates CloudFront distribution with correct configuration', () => {
+      // Test media distribution
       template.hasResourceProperties('AWS::CloudFront::Distribution', {
         DistributionConfig: {
+          Comment: 'VoisLab Media CDN - test',
+          Enabled: true,
+          HttpVersion: 'http2',
+          IPV6Enabled: true,
+          PriceClass: 'PriceClass_100',
+          DefaultCacheBehavior: {
+            AllowedMethods: ['GET', 'HEAD', 'OPTIONS'],
+            CachedMethods: ['GET', 'HEAD', 'OPTIONS'],
+            Compress: true,
+            ViewerProtocolPolicy: 'redirect-to-https',
+          },
+        },
+      });
+
+      // Test website distribution
+      template.hasResourceProperties('AWS::CloudFront::Distribution', {
+        DistributionConfig: {
+          Comment: 'VoisLab Website - test',
           DefaultRootObject: 'index.html',
           Enabled: true,
           HttpVersion: 'http2',
@@ -335,15 +355,6 @@ describe('VoisLab Website Infrastructure', () => {
             Compress: true,
             ViewerProtocolPolicy: 'redirect-to-https',
           },
-          CacheBehaviors: [
-            {
-              PathPattern: '/media/*',
-              AllowedMethods: ['GET', 'HEAD', 'OPTIONS'],
-              CachedMethods: ['GET', 'HEAD', 'OPTIONS'],
-              Compress: true,
-              ViewerProtocolPolicy: 'redirect-to-https',
-            },
-          ],
           CustomErrorResponses: [
             {
               ErrorCode: 404,
@@ -419,17 +430,10 @@ describe('VoisLab Website Infrastructure', () => {
     });
 
     test('CloudFront enforces HTTPS', () => {
-      template.hasResourceProperties('AWS::CloudFront::Distribution', {
-        DistributionConfig: {
-          DefaultCacheBehavior: {
-            ViewerProtocolPolicy: 'redirect-to-https',
-          },
-          CacheBehaviors: Match.arrayWith([
-            Match.objectLike({
-              ViewerProtocolPolicy: 'redirect-to-https',
-            }),
-          ]),
-        },
+      // Check that all CloudFront distributions enforce HTTPS
+      const distributions = template.findResources('AWS::CloudFront::Distribution');
+      Object.values(distributions).forEach((distribution: any) => {
+        expect(distribution.Properties.DistributionConfig.DefaultCacheBehavior.ViewerProtocolPolicy).toBe('redirect-to-https');
       });
     });
   });
@@ -456,12 +460,20 @@ describe('VoisLab Website Infrastructure', () => {
         Description: 'Name of the Lambda function for audio processing',
       });
 
-      template.hasOutput('DistributionId', {
-        Description: 'CloudFront Distribution ID',
+      template.hasOutput('MediaDistributionId', {
+        Description: 'Media CloudFront Distribution ID',
       });
 
-      template.hasOutput('DistributionDomainName', {
-        Description: 'CloudFront Distribution Domain Name',
+      template.hasOutput('MediaDistributionDomainName', {
+        Description: 'Media CloudFront Distribution Domain Name',
+      });
+
+      template.hasOutput('WebsiteDistributionId', {
+        Description: 'Website CloudFront Distribution ID',
+      });
+
+      template.hasOutput('WebsiteURL', {
+        Description: 'TEST website URL (CloudFront)',
       });
     });
   });

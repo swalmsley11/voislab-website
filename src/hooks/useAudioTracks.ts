@@ -4,7 +4,11 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { AudioTrack, AudioTrackWithUrls, AudioError } from '../types/audio-track';
+import {
+  AudioTrack,
+  AudioTrackWithUrls,
+  AudioError,
+} from '../types/audio-track';
 import { dynamoDBService } from '../services/dynamodb-service';
 import { s3Service } from '../services/s3-service';
 
@@ -30,9 +34,11 @@ interface CacheEntry {
 
 let cache: CacheEntry | null = null;
 
-export const useAudioTracks = (options: UseAudioTracksOptions = {}): UseAudioTracksState => {
+export const useAudioTracks = (
+  options: UseAudioTracksOptions = {}
+): UseAudioTracksState => {
   const { enableCache = true, cacheTimeout = 5 * 60 * 1000 } = options; // 5 minutes default
-  
+
   const [tracks, setTracks] = useState<AudioTrackWithUrls[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AudioError | null>(null);
@@ -48,37 +54,45 @@ export const useAudioTracks = (options: UseAudioTracksOptions = {}): UseAudioTra
   /**
    * Enhance tracks with secure URLs
    */
-  const enhanceTracksWithUrls = useCallback(async (rawTracks: AudioTrack[]): Promise<AudioTrackWithUrls[]> => {
-    const enhancedTracks: AudioTrackWithUrls[] = [];
+  const enhanceTracksWithUrls = useCallback(
+    async (rawTracks: AudioTrack[]): Promise<AudioTrackWithUrls[]> => {
+      const enhancedTracks: AudioTrackWithUrls[] = [];
 
-    for (const track of rawTracks) {
-      try {
-        // Extract the S3 key from the fileUrl (assuming it's stored as a key or full URL)
-        const s3Key = track.fileUrl.includes('://') 
-          ? track.fileUrl.split('/').pop() || track.fileUrl
-          : track.fileUrl;
+      for (const track of rawTracks) {
+        try {
+          // Extract the S3 key from the fileUrl (assuming it's stored as a key or full URL)
+          const s3Key = track.fileUrl.includes('://')
+            ? track.fileUrl.split('/').pop() || track.fileUrl
+            : track.fileUrl;
 
-        // Get secure URLs with fallbacks
-        const urlData = await s3Service.getAudioUrlsWithFallbacks(s3Key.replace(/\.[^/.]+$/, ''));
-        
-        enhancedTracks.push({
-          ...track,
-          secureUrl: urlData.primary,
-          fallbackUrls: urlData.fallbacks,
-        });
-      } catch (urlError) {
-        console.warn(`Failed to generate secure URL for track ${track.id}:`, urlError);
-        // Include track with original URL as fallback
-        enhancedTracks.push({
-          ...track,
-          secureUrl: track.fileUrl,
-          fallbackUrls: [],
-        });
+          // Get secure URLs with fallbacks
+          const urlData = await s3Service.getAudioUrlsWithFallbacks(
+            s3Key.replace(/\.[^/.]+$/, '')
+          );
+
+          enhancedTracks.push({
+            ...track,
+            secureUrl: urlData.primary,
+            fallbackUrls: urlData.fallbacks,
+          });
+        } catch (urlError) {
+          console.warn(
+            `Failed to generate secure URL for track ${track.id}:`,
+            urlError
+          );
+          // Include track with original URL as fallback
+          enhancedTracks.push({
+            ...track,
+            secureUrl: track.fileUrl,
+            fallbackUrls: [],
+          });
+        }
       }
-    }
 
-    return enhancedTracks;
-  }, []);
+      return enhancedTracks;
+    },
+    []
+  );
 
   /**
    * Fetch tracks from DynamoDB and enhance with secure URLs
@@ -97,10 +111,10 @@ export const useAudioTracks = (options: UseAudioTracksOptions = {}): UseAudioTra
 
       // Fetch from DynamoDB
       const rawTracks = await dynamoDBService.getAllTracks();
-      
+
       // Enhance with secure URLs
       const enhancedTracks = await enhanceTracksWithUrls(rawTracks);
-      
+
       // Update cache
       if (enableCache) {
         cache = {
@@ -125,16 +139,22 @@ export const useAudioTracks = (options: UseAudioTracksOptions = {}): UseAudioTra
   /**
    * Get track by ID
    */
-  const getTrackById = useCallback((id: string): AudioTrackWithUrls | undefined => {
-    return tracks.find(track => track.id === id);
-  }, [tracks]);
+  const getTrackById = useCallback(
+    (id: string): AudioTrackWithUrls | undefined => {
+      return tracks.find((track) => track.id === id);
+    },
+    [tracks]
+  );
 
   /**
    * Get tracks by genre
    */
-  const getTracksByGenre = useCallback((genre: string): AudioTrackWithUrls[] => {
-    return tracks.filter(track => track.genre === genre);
-  }, [tracks]);
+  const getTracksByGenre = useCallback(
+    (genre: string): AudioTrackWithUrls[] => {
+      return tracks.filter((track) => track.genre === genre);
+    },
+    [tracks]
+  );
 
   /**
    * Refetch tracks (bypasses cache)

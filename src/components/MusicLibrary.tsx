@@ -15,7 +15,10 @@ interface MusicLibraryProps {
 type ViewMode = 'grid' | 'list';
 type SortBy = 'title' | 'date' | 'duration';
 
-const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], className = '' }) => {
+const MusicLibrary: React.FC<MusicLibraryProps> = ({
+  fallbackTracks = [],
+  className = '',
+}) => {
   const { tracks, loading, error, refetch } = useAudioTracks();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('');
@@ -29,7 +32,7 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
   // Get unique genres for filter dropdown
   const genres = useMemo(() => {
     const genreSet = new Set<string>();
-    displayTracks.forEach(track => {
+    displayTracks.forEach((track) => {
       if (track.genre) {
         genreSet.add(track.genre);
       }
@@ -39,13 +42,16 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
 
   // Filter and sort tracks
   const filteredAndSortedTracks = useMemo(() => {
-    let filtered = displayTracks.filter(track => {
-      const matchesSearch = track.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           track.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           track.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+    let filtered = displayTracks.filter((track) => {
+      const matchesSearch =
+        track.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        track.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        track.tags?.some((tag) =>
+          tag.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
       const matchesGenre = !selectedGenre || track.genre === selectedGenre;
-      
+
       return matchesSearch && matchesGenre;
     });
 
@@ -55,7 +61,10 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
         case 'title':
           return a.title.localeCompare(b.title);
         case 'date':
-          return new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime();
+          return (
+            new Date(b.createdDate).getTime() -
+            new Date(a.createdDate).getTime()
+          );
         case 'duration':
           return (b.duration || 0) - (a.duration || 0);
         default:
@@ -77,7 +86,7 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     }).format(new Date(date));
   };
 
@@ -126,7 +135,7 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
           <p className="library-description">
             Explore our collection of original compositions and audio creations
           </p>
-          
+
           {/* Connection Status */}
           {error && fallbackTracks.length > 0 && (
             <div className="library-warning">
@@ -161,8 +170,10 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
                 className="genre-filter"
               >
                 <option value="">All Genres</option>
-                {genres.map(genre => (
-                  <option key={genre} value={genre}>{genre}</option>
+                {genres.map((genre) => (
+                  <option key={genre} value={genre}>
+                    {genre}
+                  </option>
                 ))}
               </select>
             </div>
@@ -199,7 +210,9 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
             </div>
 
             <div className="sort-container">
-              <label htmlFor="sort-select" className="sort-label">Sort by:</label>
+              <label htmlFor="sort-select" className="sort-label">
+                Sort by:
+              </label>
               <select
                 id="sort-select"
                 value={sortBy}
@@ -232,7 +245,7 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({ fallbackTracks = [], classN
           </div>
         ) : (
           <div className={`tracks-container ${viewMode}`}>
-            {filteredAndSortedTracks.map(track => (
+            {filteredAndSortedTracks.map((track) => (
               <TrackItem
                 key={track.id}
                 track={track}
@@ -275,25 +288,27 @@ const TrackItem: React.FC<TrackItemProps> = ({
           <p className="track-description">{track.description}</p>
         )}
         <div className="track-metadata">
-          <span className="track-duration">{formatDuration(track.duration)}</span>
+          <span className="track-duration">
+            {formatDuration(track.duration)}
+          </span>
           <span className="track-date">{formatDate(track.createdDate)}</span>
-          {track.genre && (
-            <span className="track-genre">{track.genre}</span>
-          )}
+          {track.genre && <span className="track-genre">{track.genre}</span>}
         </div>
         {track.tags && track.tags.length > 0 && (
           <div className="track-tags">
-            {track.tags.map(tag => (
-              <span key={tag} className="tag">{tag}</span>
+            {track.tags.map((tag) => (
+              <span key={tag} className="tag">
+                {tag}
+              </span>
             ))}
           </div>
         )}
-        
+
         {/* Streaming Platform Links */}
         {directLinks.length > 0 && (
           <div className="track-streaming-links">
-            <StreamingLinks 
-              streamingLinks={directLinks} 
+            <StreamingLinks
+              streamingLinks={directLinks}
               size="small"
               showLabels={false}
             />
@@ -301,11 +316,7 @@ const TrackItem: React.FC<TrackItemProps> = ({
         )}
       </div>
       <div className="track-player">
-        <AudioPlayer
-          track={track}
-          onPlay={onPlay}
-          onPause={onPause}
-        />
+        <AudioPlayer track={track} onPlay={onPlay} onPause={onPause} />
       </div>
     </div>
   );

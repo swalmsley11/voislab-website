@@ -9,6 +9,8 @@ import { runIntegrationTests } from './utils/integration-test';
 (window as any).testVoisLabIntegration = runIntegrationTests;
 
 console.log('🎵 VoisLab Integration Test Available!');
-console.log('Run testVoisLabIntegration() in the browser console to test data integration.');
+console.log(
+  'Run testVoisLabIntegration() in the browser console to test data integration.'
+);
 
 export { runIntegrationTests };

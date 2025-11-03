@@ -17,7 +17,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onPlay,
   onPause,
   onError,
-  onTrackEnd
+  onTrackEnd,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -125,7 +125,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const formatTime = (time: number): string => {
     if (isNaN(time)) return '0:00';
-    
+
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -135,12 +135,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <div className={`audio-player ${className}`}>
-      <audio
-        ref={audioRef}
-        src={track.secureUrl}
-        preload="metadata"
-      />
-      
+      <audio ref={audioRef} src={track.secureUrl} preload="metadata" />
+
       <div className="player-info">
         <h3 className="track-title">{track.title}</h3>
         {error && <div className="error-message">{error}</div>}
@@ -179,7 +175,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
               onChange={handleSeek}
               disabled={!duration || !!error}
               style={{
-                background: `linear-gradient(to right, #4ecdc4 0%, #4ecdc4 ${progressPercentage}%, #333 ${progressPercentage}%, #333 100%)`
+                background: `linear-gradient(to right, #4ecdc4 0%, #4ecdc4 ${progressPercentage}%, #333 ${progressPercentage}%, #333 100%)`,
               }}
             />
           </div>
@@ -200,7 +196,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             value={volume}
             onChange={handleVolumeChange}
             style={{
-              background: `linear-gradient(to right, #4ecdc4 0%, #4ecdc4 ${volume * 100}%, #333 ${volume * 100}%, #333 100%)`
+              background: `linear-gradient(to right, #4ecdc4 0%, #4ecdc4 ${volume * 100}%, #333 ${volume * 100}%, #333 100%)`,
             }}
           />
         </div>

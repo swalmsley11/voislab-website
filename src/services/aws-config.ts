@@ -14,12 +14,13 @@ const AWS_SECRET_ACCESS_KEY = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
 // AWS Client configuration
 const awsConfig = {
   region: AWS_REGION,
-  ...(AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && {
-    credentials: {
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-    },
-  }),
+  ...(AWS_ACCESS_KEY_ID &&
+    AWS_SECRET_ACCESS_KEY && {
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      },
+    }),
 };
 
 // DynamoDB Client
@@ -31,7 +32,8 @@ export const s3Client = new S3Client(awsConfig);
 // Environment variables for service configuration
 export const AWS_CONFIG = {
   region: AWS_REGION,
-  dynamoDBTableName: import.meta.env.VITE_DYNAMODB_TABLE_NAME || 'voislab-tracks',
+  dynamoDBTableName:
+    import.meta.env.VITE_DYNAMODB_TABLE_NAME || 'voislab-tracks',
   s3MediaBucket: import.meta.env.VITE_S3_MEDIA_BUCKET || 'voislab-media',
   cloudfrontDomain: import.meta.env.VITE_CLOUDFRONT_DOMAIN || '',
 } as const;

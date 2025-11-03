@@ -29,7 +29,12 @@ export interface AudioTrackWithUrls extends AudioTrack {
 
 // Error types for audio operations
 export interface AudioError {
-  type: 'network' | 'not-found' | 'format-unsupported' | 'permission-denied' | 'unknown';
+  type:
+    | 'network'
+    | 'not-found'
+    | 'format-unsupported'
+    | 'permission-denied'
+    | 'unknown';
   message: string;
   trackId?: string;
 }
