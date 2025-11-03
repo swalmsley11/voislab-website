@@ -126,6 +126,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -138,6 +145,9 @@ jobs:
 
       - name: Deploy infrastructure to DEV
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: npm run deploy:dev
 
       - name: Wait for stack deployment
@@ -201,6 +211,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -213,6 +230,9 @@ jobs:
 
       - name: Deploy infrastructure to PROD
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: npm run deploy:prod
 
       - name: Wait for stack deployment

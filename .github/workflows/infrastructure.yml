@@ -46,6 +46,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "AWS Account ID: $ACCOUNT_ID"
+
       - name: Install infrastructure dependencies
         working-directory: infrastructure
         run: npm ci
@@ -60,6 +67,9 @@ jobs:
 
       - name: CDK Bootstrap (if needed)
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if [ "${{ github.event.inputs.environment }}" == "development" ]; then
             npm run bootstrap -- --context environment=dev
@@ -70,6 +80,9 @@ jobs:
       - name: CDK Diff
         if: github.event.inputs.action == 'diff'
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if [ "${{ github.event.inputs.environment }}" == "development" ]; then
             npm run diff -- --context environment=dev
@@ -80,6 +93,9 @@ jobs:
       - name: CDK Deploy
         if: github.event.inputs.action == 'deploy'
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if [ "${{ github.event.inputs.environment }}" == "development" ]; then
             npm run deploy:dev -- --require-approval never
@@ -90,6 +106,9 @@ jobs:
       - name: CDK Destroy
         if: github.event.inputs.action == 'destroy'
         working-directory: infrastructure
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws-account.outputs.account-id }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if [ "${{ github.event.inputs.environment }}" == "development" ]; then
             cdk destroy --context environment=dev --force
