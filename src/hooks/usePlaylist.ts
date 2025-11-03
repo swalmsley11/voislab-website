@@ -60,7 +60,7 @@ export const usePlaylist = (): UsePlaylistReturn => {
   const hasPrevious = useMemo((): boolean => {
     if (isRepeating) return playlist.length > 0;
     return currentIndex > 0;
-  }, [currentIndex, isRepeating]);
+  }, [currentIndex, playlist.length, isRepeating]);
 
   /**
    * Generate shuffled indices

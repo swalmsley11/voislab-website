@@ -316,8 +316,8 @@ export class VoislabWebsiteStack extends cdk.Stack {
           'CONTENT_PROMOTER_FUNCTION_NAME': contentPromoterFunction.functionName,
           'PIPELINE_TESTER_FUNCTION_NAME': pipelineTesterFunction.functionName,
           'NOTIFICATION_TOPIC_ARN': notificationTopic.topicArn,
-          'AWS_ACCOUNT_ID': this.account,
-          'AWS_REGION': this.region,
+          'VOISLAB_ACCOUNT_ID': this.account,
+          'VOISLAB_REGION': this.region,
         },
         timeout: cdk.Duration.minutes(15),
         memorySize: 512,
@@ -464,7 +464,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
     );
 
     // CloudFront distribution for media content
-    const distribution = new cloudfront.Distribution(this, 'MediaDistribution', {
+    const mediaDistribution = new cloudfront.Distribution(this, 'MediaDistribution', {
       defaultBehavior: {
         origin: new origins.S3Origin(mediaBucket, {
           originAccessIdentity,
@@ -482,7 +482,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
     // Store configuration in SSM Parameter Store for frontend access
     new ssm.StringParameter(this, 'MediaDistributionDomain', {
       parameterName: `/voislab/${environment}/media-distribution-domain`,
-      stringValue: distribution.distributionDomainName,
+      stringValue: mediaDistribution.distributionDomainName,
       description: 'CloudFront distribution domain for media content',
     });
 
@@ -498,122 +498,13 @@ export class VoislabWebsiteStack extends cdk.Stack {
       description: 'DynamoDB table name for audio metadata',
     });
 
-    // Amplify App for frontend hosting
-    let amplifyApp: amplify.App | undefined;
+    // Amplify App for frontend hosting using L1 constructs
+    let amplifyApp: amplify.CfnApp | undefined;
     let certificate: certificatemanager.Certificate | undefined;
     let hostedZone: route53.IHostedZone | undefined;
 
     if (githubRepository && githubAccessToken) {
-      // Create Amplify app with GitHub integration
-      amplifyApp = new amplify.App(this, 'AmplifyApp', {
-        appName: `voislab-website-${environment}`,
-        sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
-          owner: githubRepository.split('/')[0],
-          repository: githubRepository.split('/')[1],
-          oauthToken: cdk.SecretValue.unsafePlainText(githubAccessToken),
-        }),
-        buildSpec: amplify.BuildSpec.fromObjectToYaml({
-          version: '1.0',
-          applications: [
-            {
-              frontend: {
-                phases: {
-                  preBuild: {
-                    commands: [
-                      'npm ci',
-                    ],
-                  },
-                  build: {
-                    commands: [
-                      'npm run build',
-                    ],
-                  },
-                },
-                artifacts: {
-                  baseDirectory: 'dist',
-                  files: ['**/*'],
-                },
-                cache: {
-                  paths: ['node_modules/**/*'],
-                },
-              },
-            },
-          ],
-        }),
-        environmentVariables: {
-          'VITE_AWS_REGION': this.region,
-          'VITE_ENVIRONMENT': environment,
-          'VITE_MEDIA_DISTRIBUTION_DOMAIN': distribution.distributionDomainName,
-          'VITE_METADATA_TABLE_NAME': audioMetadataTable.tableName,
-          'VITE_MEDIA_BUCKET_NAME': mediaBucket.bucketName,
-        },
-        customRules: [
-          {
-            source: '/<*>',
-            target: '/index.html',
-            status: amplify.RedirectStatus.NOT_FOUND_REWRITE,
-          },
-        ],
-      });
-
-      // Create branches for different environments
-      const branchName = environment === 'prod' ? 'main' : 'develop';
-      const branch = amplifyApp.addBranch(branchName, {
-        branchName,
-        autoBuild: true,
-        pullRequestPreview: environment === 'dev',
-        stage: environment === 'prod' ? amplify.Stage.PRODUCTION : amplify.Stage.DEVELOPMENT,
-      });
-
-      // Domain configuration for production
-      if (environment === 'prod' && domainName && hostedZoneId) {
-        // Import existing hosted zone
-        hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-          hostedZoneId,
-          zoneName: domainName,
-        });
-
-        // Create SSL certificate
-        certificate = new certificatemanager.Certificate(this, 'Certificate', {
-          domainName,
-          subjectAlternativeNames: [`www.${domainName}`],
-          validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
-        });
-
-        // Add custom domain to Amplify app
-        const domain = amplifyApp.addDomain('Domain', {
-          domainName,
-          subDomains: [
-            {
-              branch,
-              prefix: '',
-            },
-            {
-              branch,
-              prefix: 'www',
-            },
-          ],
-        });
-
-        // Output domain information
-        new cdk.CfnOutput(this, 'WebsiteURL', {
-          value: `https://${domainName}`,
-          description: 'Production website URL',
-        });
-
-        new cdk.CfnOutput(this, 'CertificateArn', {
-          value: certificate.certificateArn,
-          description: 'SSL certificate ARN',
-        });
-      } else {
-        // For dev environment, use Amplify default domain
-        new cdk.CfnOutput(this, 'WebsiteURL', {
-          value: `https://${branchName}.${amplifyApp.defaultDomain}`,
-          description: `${environment.toUpperCase()} website URL`,
-        });
-      }
-
-      // Grant Amplify service role permissions to access AWS resources
+      // Create Amplify service role first
       const amplifyServiceRole = new iam.Role(this, 'AmplifyServiceRole', {
         assumedBy: new iam.ServicePrincipal('amplify.amazonaws.com'),
         description: 'Service role for Amplify app to access AWS resources',
@@ -637,12 +528,122 @@ export class VoislabWebsiteStack extends cdk.Stack {
         })
       );
 
-      // Update Amplify app to use the service role
-      const cfnApp = amplifyApp.node.defaultChild as amplify.CfnApp;
-      cfnApp.iamServiceRole = amplifyServiceRole.roleArn;
+      // Create Amplify app with GitHub integration using L1 constructs
+      amplifyApp = new amplify.CfnApp(this, 'AmplifyApp', {
+        name: `voislab-website-${environment}`,
+        repository: `https://github.com/${githubRepository}`,
+        accessToken: githubAccessToken,
+        buildSpec: `version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+    appRoot: .`,
+        environmentVariables: [
+          {
+            name: 'VITE_AWS_REGION',
+            value: this.region,
+          },
+          {
+            name: 'VITE_ENVIRONMENT',
+            value: environment,
+          },
+          {
+            name: 'VITE_MEDIA_DISTRIBUTION_DOMAIN',
+            value: mediaDistribution.distributionDomainName,
+          },
+          {
+            name: 'VITE_METADATA_TABLE_NAME',
+            value: audioMetadataTable.tableName,
+          },
+          {
+            name: 'VITE_MEDIA_BUCKET_NAME',
+            value: mediaBucket.bucketName,
+          },
+        ],
+        customRules: [
+          {
+            source: '/<*>',
+            target: '/index.html',
+            status: '200',
+          },
+        ],
+        iamServiceRole: amplifyServiceRole.roleArn,
+      });
+
+      // Create branch for the environment
+      const branchName = environment === 'prod' ? 'main' : 'develop';
+      const branch = new amplify.CfnBranch(this, 'AmplifyBranch', {
+        appId: amplifyApp.attrAppId,
+        branchName,
+        enableAutoBuild: true,
+        enablePullRequestPreview: environment === 'dev',
+        stage: environment === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT',
+      });
+
+      // Domain configuration for production
+      if (environment === 'prod' && domainName && hostedZoneId) {
+        // Import existing hosted zone
+        hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+          hostedZoneId,
+          zoneName: domainName,
+        });
+
+        // Create SSL certificate
+        certificate = new certificatemanager.Certificate(this, 'Certificate', {
+          domainName,
+          subjectAlternativeNames: [`www.${domainName}`],
+          validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
+        });
+
+        // Add custom domain to Amplify app
+        const domain = new amplify.CfnDomain(this, 'AmplifyDomain', {
+          appId: amplifyApp.attrAppId,
+          domainName,
+          subDomainSettings: [
+            {
+              branchName,
+              prefix: '',
+            },
+            {
+              branchName,
+              prefix: 'www',
+            },
+          ],
+        });
+
+        // Output domain information
+        new cdk.CfnOutput(this, 'WebsiteURL', {
+          value: `https://${domainName}`,
+          description: 'Production website URL',
+        });
+
+        new cdk.CfnOutput(this, 'CertificateArn', {
+          value: certificate.certificateArn,
+          description: 'SSL certificate ARN',
+        });
+      } else {
+        // For dev environment, use Amplify default domain
+        new cdk.CfnOutput(this, 'WebsiteURL', {
+          value: `https://${branchName}.${amplifyApp.attrDefaultDomain}`,
+          description: `${environment.toUpperCase()} website URL`,
+        });
+      }
 
       new cdk.CfnOutput(this, 'AmplifyAppId', {
-        value: amplifyApp.appId,
+        value: amplifyApp.attrAppId,
         description: 'Amplify App ID',
       });
 
@@ -712,12 +713,12 @@ export class VoislabWebsiteStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'MediaDistributionId', {
-      value: distribution.distributionId,
+      value: mediaDistribution.distributionId,
       description: 'Media CloudFront Distribution ID',
     });
 
     new cdk.CfnOutput(this, 'MediaDistributionDomainName', {
-      value: distribution.distributionDomainName,
+      value: mediaDistribution.distributionDomainName,
       description: 'Media CloudFront Distribution Domain Name',
     });
 

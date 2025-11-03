@@ -3,7 +3,7 @@
  * Manages audio player state and playback functionality
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { AudioTrack, AudioPlayerState, AudioError } from '../types/audio-track';
 
 interface UseAudioPlayerOptions {
