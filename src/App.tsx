@@ -16,6 +16,10 @@ const LicensingInfo = React.lazy(() => import('./components/LicensingInfo'));
 // Import test integration for development
 import './test-integration';
 
+// Import analytics and monitoring
+import { voisLabAnalytics } from './utils/analytics';
+import './utils/monitoring'; // Initialize monitoring service
+
 // Sample data for demonstration and fallback
 const sampleTracks: AudioTrackWithUrls[] = [
   {
@@ -138,6 +142,28 @@ const PageLoader: React.FC = () => (
 );
 
 function App() {
+  // Track page load performance
+  React.useEffect(() => {
+    const startTime = performance.now();
+    
+    const handleLoad = () => {
+      const loadTime = performance.now() - startTime;
+      voisLabAnalytics.trackPageLoadTime(loadTime);
+    };
+
+    if (document.readyState === 'complete') {
+      handleLoad();
+    } else {
+      window.addEventListener('load', handleLoad);
+      return () => window.removeEventListener('load', handleLoad);
+    }
+  }, []);
+
+  // Track route changes
+  React.useEffect(() => {
+    voisLabAnalytics.trackPageView();
+  }, []);
+
   return (
     <Router>
       <div className="App">

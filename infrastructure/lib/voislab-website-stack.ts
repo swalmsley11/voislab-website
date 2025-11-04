@@ -15,6 +15,8 @@ import * as amplify from 'aws-cdk-lib/aws-amplify';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as logs from 'aws-cdk-lib/aws-logs';
 
 export interface VoislabWebsiteStackProps extends cdk.StackProps {
   environment: string;
@@ -812,5 +814,384 @@ applications:
       value: uatRunnerFunction.functionName,
       description: 'Name of the Lambda function for UAT testing',
     });
+
+    // CloudWatch Monitoring and Alerting
+    this.setupMonitoringAndAlerting(
+      environment,
+      audioProcessorFunction,
+      formatConverterFunction,
+      pipelineTesterFunction,
+      uatRunnerFunction,
+      contentPromoterFunction,
+      promotionOrchestratorFunction,
+      uploadBucket,
+      mediaBucket,
+      audioMetadataTable,
+      mediaDistribution,
+      notificationTopic
+    );
+  }
+
+  /**
+   * Setup comprehensive CloudWatch monitoring and alerting
+   */
+  private setupMonitoringAndAlerting(
+    environment: string,
+    audioProcessorFunction: lambda.Function,
+    formatConverterFunction: lambda.Function,
+    pipelineTesterFunction: lambda.Function,
+    uatRunnerFunction: lambda.Function,
+    contentPromoterFunction?: lambda.Function,
+    promotionOrchestratorFunction?: lambda.Function,
+    uploadBucket?: s3.Bucket,
+    mediaBucket?: s3.Bucket,
+    audioMetadataTable?: dynamodb.Table,
+    mediaDistribution?: cloudfront.Distribution,
+    notificationTopic?: sns.Topic
+  ): void {
+    
+    // Create CloudWatch Log Groups with retention
+    const logGroups = [
+      audioProcessorFunction,
+      formatConverterFunction,
+      pipelineTesterFunction,
+      uatRunnerFunction,
+      contentPromoterFunction,
+      promotionOrchestratorFunction,
+    ].filter(Boolean).map(fn => {
+      return new logs.LogGroup(this, `${fn!.functionName}LogGroup`, {
+        logGroupName: `/aws/lambda/${fn!.functionName}`,
+        retention: environment === 'prod' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
+        removalPolicy: environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      });
+    });
+
+    // Lambda Function Monitoring
+    const lambdaFunctions = [
+      { name: 'AudioProcessor', fn: audioProcessorFunction },
+      { name: 'FormatConverter', fn: formatConverterFunction },
+      { name: 'PipelineTester', fn: pipelineTesterFunction },
+      { name: 'UATRunner', fn: uatRunnerFunction },
+    ];
+
+    if (contentPromoterFunction) {
+      lambdaFunctions.push({ name: 'ContentPromoter', fn: contentPromoterFunction });
+    }
+
+    if (promotionOrchestratorFunction) {
+      lambdaFunctions.push({ name: 'PromotionOrchestrator', fn: promotionOrchestratorFunction });
+    }
+
+    // Create alarms for each Lambda function
+    lambdaFunctions.forEach(({ name, fn }) => {
+      // Error rate alarm
+      const errorAlarm = new cloudwatch.Alarm(this, `${name}ErrorAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-errors`,
+        alarmDescription: `High error rate for ${name} function`,
+        metric: fn.metricErrors({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: environment === 'prod' ? 5 : 10,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Duration alarm
+      const durationAlarm = new cloudwatch.Alarm(this, `${name}DurationAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-duration`,
+        alarmDescription: `High duration for ${name} function`,
+        metric: fn.metricDuration({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: fn.timeout ? fn.timeout.toMilliseconds() * 0.8 : 30000, // 80% of timeout
+        evaluationPeriods: 3,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Throttle alarm
+      const throttleAlarm = new cloudwatch.Alarm(this, `${name}ThrottleAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-throttles`,
+        alarmDescription: `Throttling detected for ${name} function`,
+        metric: fn.metricThrottles({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Add alarms to SNS topic if available
+      if (notificationTopic) {
+        errorAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        durationAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        throttleAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+      }
+    });
+
+    // DynamoDB Monitoring
+    if (audioMetadataTable) {
+      // Read throttle alarm
+      const dynamoReadThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoReadThrottleAlarm', {
+        alarmName: `voislab-${environment}-dynamodb-read-throttles`,
+        alarmDescription: 'DynamoDB read throttling detected',
+        metric: audioMetadataTable.metricThrottledRequestsForRead({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Write throttle alarm
+      const dynamoWriteThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoWriteThrottleAlarm', {
+        alarmName: `voislab-${environment}-dynamodb-write-throttles`,
+        alarmDescription: 'DynamoDB write throttling detected',
+        metric: audioMetadataTable.metricThrottledRequestsForWrite({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // System errors alarm
+      const dynamoSystemErrorsAlarm = new cloudwatch.Alarm(this, 'DynamoSystemErrorsAlarm', {
+        alarmName: `voislab-${environment}-dynamodb-system-errors`,
+        alarmDescription: 'DynamoDB system errors detected',
+        metric: audioMetadataTable.metricSystemErrorsForRead({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        dynamoReadThrottleAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        dynamoWriteThrottleAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        dynamoSystemErrorsAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+      }
+    }
+
+    // S3 Monitoring
+    if (uploadBucket && mediaBucket) {
+      // S3 4xx errors alarm
+      const s3ClientErrorsAlarm = new cloudwatch.Alarm(this, 'S3ClientErrorsAlarm', {
+        alarmName: `voislab-${environment}-s3-client-errors`,
+        alarmDescription: 'High S3 4xx error rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/S3',
+          metricName: '4xxErrors',
+          dimensionsMap: {
+            BucketName: mediaBucket.bucketName,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 10,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // S3 5xx errors alarm
+      const s3ServerErrorsAlarm = new cloudwatch.Alarm(this, 'S3ServerErrorsAlarm', {
+        alarmName: `voislab-${environment}-s3-server-errors`,
+        alarmDescription: 'S3 5xx errors detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/S3',
+          metricName: '5xxErrors',
+          dimensionsMap: {
+            BucketName: mediaBucket.bucketName,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        s3ClientErrorsAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        s3ServerErrorsAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+      }
+    }
+
+    // CloudFront Monitoring
+    if (mediaDistribution) {
+      // CloudFront 4xx error rate alarm
+      const cloudFrontClientErrorsAlarm = new cloudwatch.Alarm(this, 'CloudFrontClientErrorsAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-client-errors`,
+        alarmDescription: 'High CloudFront 4xx error rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: '4xxErrorRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: 5, // 5% error rate
+        evaluationPeriods: 3,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // CloudFront 5xx error rate alarm
+      const cloudFrontServerErrorsAlarm = new cloudwatch.Alarm(this, 'CloudFrontServerErrorsAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-server-errors`,
+        alarmDescription: 'CloudFront 5xx errors detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: '5xxErrorRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: 1, // 1% error rate
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // CloudFront cache hit rate alarm (low cache hit rate)
+      const cloudFrontCacheHitRateAlarm = new cloudwatch.Alarm(this, 'CloudFrontCacheHitRateAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-low-cache-hit-rate`,
+        alarmDescription: 'Low CloudFront cache hit rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: 'CacheHitRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(15),
+          statistic: 'Average',
+        }),
+        threshold: 80, // 80% cache hit rate
+        evaluationPeriods: 3,
+        comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        cloudFrontClientErrorsAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        cloudFrontServerErrorsAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+        cloudFrontCacheHitRateAlarm.addAlarmAction(new cloudwatch.SnsAction(notificationTopic));
+      }
+    }
+
+    // Custom Metrics Dashboard
+    const dashboard = new cloudwatch.Dashboard(this, 'VoisLabDashboard', {
+      dashboardName: `voislab-${environment}-dashboard`,
+    });
+
+    // Lambda metrics widget
+    const lambdaMetricsWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Function Metrics',
+      left: lambdaFunctions.map(({ fn }) => fn.metricInvocations()),
+      right: lambdaFunctions.map(({ fn }) => fn.metricErrors()),
+      width: 12,
+      height: 6,
+    });
+
+    // Lambda duration widget
+    const lambdaDurationWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Function Duration',
+      left: lambdaFunctions.map(({ fn }) => fn.metricDuration()),
+      width: 12,
+      height: 6,
+    });
+
+    dashboard.addWidgets(lambdaMetricsWidget, lambdaDurationWidget);
+
+    // DynamoDB metrics widget
+    if (audioMetadataTable) {
+      const dynamoWidget = new cloudwatch.GraphWidget({
+        title: 'DynamoDB Metrics',
+        left: [
+          audioMetadataTable.metricConsumedReadCapacityUnits(),
+          audioMetadataTable.metricConsumedWriteCapacityUnits(),
+        ],
+        right: [
+          audioMetadataTable.metricThrottledRequestsForRead(),
+          audioMetadataTable.metricThrottledRequestsForWrite(),
+        ],
+        width: 12,
+        height: 6,
+      });
+
+      dashboard.addWidgets(dynamoWidget);
+    }
+
+    // CloudFront metrics widget
+    if (mediaDistribution) {
+      const cloudFrontWidget = new cloudwatch.GraphWidget({
+        title: 'CloudFront Metrics',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: 'Requests',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Sum',
+          }),
+        ],
+        right: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: '4xxErrorRate',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Average',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: '5xxErrorRate',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Average',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      });
+
+      dashboard.addWidgets(cloudFrontWidget);
+    }
+
+    // Store monitoring configuration in SSM
+    new ssm.StringParameter(this, 'MonitoringConfig', {
+      parameterName: `/voislab/${environment}/monitoring-config`,
+      stringValue: JSON.stringify({
+        dashboardUrl: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${dashboard.dashboardName}`,
+        logGroups: logGroups.map(lg => lg.logGroupName),
+        notificationTopicArn: notificationTopic?.topicArn,
+        environment,
+      }),
+      description: 'CloudWatch monitoring configuration for VoisLab',
+    });
+
+    // Output monitoring information
+    new cdk.CfnOutput(this, 'MonitoringDashboardUrl', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${dashboard.dashboardName}`,
+      description: 'CloudWatch Dashboard URL for monitoring',
+    });
+
+    if (notificationTopic) {
+      new cdk.CfnOutput(this, 'AlertingTopicArn', {
+        value: notificationTopic.topicArn,
+        description: 'SNS Topic ARN for alerts and notifications',
+      });
+    }
   }
 }
