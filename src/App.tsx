@@ -1,9 +1,17 @@
+import React, { Suspense } from 'react';
 import './App.css';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import MusicLibrary from './components/MusicLibrary';
 import Footer from './components/Footer';
+import SEOHead from './components/SEOHead';
 import { AudioTrackWithUrls } from './types/audio-track';
+
+// Lazy load legal pages for better performance
+const PrivacyPolicy = React.lazy(() => import('./components/PrivacyPolicy'));
+const TermsOfUse = React.lazy(() => import('./components/TermsOfUse'));
+const LicensingInfo = React.lazy(() => import('./components/LicensingInfo'));
 
 // Import test integration for development
 import './test-integration';
@@ -79,16 +87,74 @@ const sampleTracks: AudioTrackWithUrls[] = [
   },
 ];
 
+// Home page component
+const HomePage: React.FC = () => {
+  const homeStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "MusicGroup",
+    "name": "VoisLab",
+    "url": "https://voislab.com",
+    "description": "Professional audio content creation and music production services specializing in ambient, electronic, and atmospheric compositions.",
+    "genre": ["Ambient", "Electronic", "Atmospheric"],
+    "sameAs": [
+      "https://open.spotify.com/artist/voislab",
+      "https://soundcloud.com/voislab",
+      "https://www.youtube.com/@voislab"
+    ],
+    "album": sampleTracks.map(track => ({
+      "@type": "MusicRecording",
+      "name": track.title,
+      "description": track.description,
+      "duration": `PT${Math.floor(track.duration / 60)}M${track.duration % 60}S`,
+      "genre": track.genre,
+      "dateCreated": track.createdDate.toISOString().split('T')[0]
+    }))
+  };
+
+  return (
+    <>
+      <SEOHead
+        title="VoisLab - Professional Audio Content Creation & Music Production"
+        description="Discover original music compositions and professional audio content by VoisLab. Stream high-quality ambient, electronic, and atmospheric tracks directly on our website."
+        keywords="VoisLab, music production, audio content, ambient music, electronic music, original compositions, streaming, music producer, audio creation, atmospheric music"
+        url="https://voislab.com/"
+        type="website"
+        structuredData={homeStructuredData}
+      />
+      <Hero />
+      <MusicLibrary fallbackTracks={sampleTracks} />
+    </>
+  );
+};
+
+// Loading component for lazy-loaded pages
+const PageLoader: React.FC = () => (
+  <div className="page-loader">
+    <div className="loader-container">
+      <div className="loader-spinner"></div>
+      <p>Loading...</p>
+    </div>
+  </div>
+);
+
 function App() {
   return (
-    <div className="App">
-      <Header />
-      <main>
-        <Hero />
-        <MusicLibrary fallbackTracks={sampleTracks} />
-      </main>
-      <Footer />
-    </div>
+    <Router>
+      <div className="App">
+        <Header />
+        <main>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfUse />} />
+              <Route path="/licensing" element={<LicensingInfo />} />
+            </Routes>
+          </Suspense>
+        </main>
+        <Footer />
+      </div>
+    </Router>
   );
 }
 

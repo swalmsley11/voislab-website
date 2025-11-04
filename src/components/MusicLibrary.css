@@ -469,3 +469,19 @@ ng and Error States */
   padding-top: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* Copyright Notice in Track Items */
+.track-copyright {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.track-copyright .copyright-notice--minimal {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+}
+
+.track-copyright .copyright-notice--minimal .copyright-symbol {
+  color: rgba(255, 255, 255, 0.8);
+}

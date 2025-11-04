@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import AudioPlayer from './AudioPlayer';
 import StreamingLinks from './StreamingLinks';
+import CopyrightNotice from './CopyrightNotice';
 import { useAudioTracks } from '../hooks/useAudioTracks';
 import { useTrackStreamingLinks } from '../hooks/useStreamingLinks';
 import { AudioTrackWithUrls } from '../types/audio-track';
@@ -314,6 +315,15 @@ const TrackItem: React.FC<TrackItemProps> = ({
             />
           </div>
         )}
+
+        {/* Copyright Notice */}
+        <div className="track-copyright">
+          <CopyrightNotice
+            trackTitle={track.title}
+            year={new Date(track.createdDate).getFullYear()}
+            variant="minimal"
+          />
+        </div>
       </div>
       <div className="track-player">
         <AudioPlayer track={track} onPlay={onPlay} onPause={onPause} />
