@@ -8,11 +8,11 @@
     "UploadBucketName": "voislab-upload-dev-594205508266",
     "ContentPromoterFunctionName": "voislab-content-promoter-dev",
     "AudioProcessorFunctionName": "voislab-audio-processor-dev",
-    "MediaDistributionId": "E2KPZUPT83AQ37",
+    "MediaDistributionId": "E2VJRLJYY3EQ74",
     "PromotionOrchestratorFunctionName": "voislab-promotion-orchestrator-dev",
     "AudioMetadataTableName": "voislab-audio-metadata-dev",
-    "MediaDistributionDomainName": "d1ycw3i5mtneq5.cloudfront.net",
+    "MediaDistributionDomainName": "d202244p05lns8.cloudfront.net",
     "UATRunnerFunctionName": "voislab-uat-runner-dev",
-    "TestUtilsLayerArn": "arn:aws:lambda:us-west-2:594205508266:layer:voislab-test-utils-dev:2"
+    "TestUtilsLayerArn": "arn:aws:lambda:us-west-2:594205508266:layer:voislab-test-utils-dev:3"
   }
 }

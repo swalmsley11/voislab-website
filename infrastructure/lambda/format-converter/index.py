@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import datetime
 from typing import Dict, Any, List
+from urllib.parse import unquote_plus
 import logging
 
 # Configure logging
@@ -195,7 +196,10 @@ def handler(event, context):
                 if 'eventSource' in record and record['eventSource'] == 'aws:s3':
                     # Direct S3 event
                     bucket_name = record['s3']['bucket']['name']
-                    object_key = record['s3']['object']['key']
+                    # URL decode the object key (S3 events URL-encode keys with special characters)
+                    object_key = unquote_plus(record['s3']['object']['key'])
+                    
+                    logger.info(f"Received S3 event for: {object_key}")
                     
                     # Extract track ID from object key
                     # Expected format: audio/{track_id}/filename.ext
