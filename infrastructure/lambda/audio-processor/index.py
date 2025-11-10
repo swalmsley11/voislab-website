@@ -6,6 +6,7 @@ import hashlib
 import mimetypes
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from urllib.parse import unquote_plus
 import logging
 
 # Configure logging
@@ -316,7 +317,10 @@ def handler(event, context):
         # Process each S3 event record
         for record in event['Records']:
             bucket_name = record['s3']['bucket']['name']
-            object_key = record['s3']['object']['key']
+            # URL decode the object key (S3 events URL-encode keys with special characters)
+            object_key = unquote_plus(record['s3']['object']['key'])
+            
+            logger.info(f"Received S3 event for: {object_key}")
             
             # Skip non-audio files based on path
             if not object_key.startswith('audio/'):

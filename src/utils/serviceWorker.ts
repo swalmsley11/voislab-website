@@ -1,10 +1,10 @@
 // Service Worker Registration and Management
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
-  window.location.hostname === '[::1]' ||
-  window.location.hostname.match(
-    /^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/
-  )
+    window.location.hostname === '[::1]' ||
+    window.location.hostname.match(
+      /^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/
+    )
 );
 
 interface ServiceWorkerConfig {
@@ -40,13 +40,13 @@ export function registerSW(config?: ServiceWorkerConfig) {
 async function registerValidSW(swUrl: string, config?: ServiceWorkerConfig) {
   try {
     const registration = await navigator.serviceWorker.register(swUrl);
-    
+
     registration.onupdatefound = () => {
       const installingWorker = registration.installing;
       if (installingWorker == null) {
         return;
       }
-      
+
       installingWorker.onstatechange = () => {
         if (installingWorker.state === 'installed') {
           if (navigator.serviceWorker.controller) {
@@ -73,12 +73,15 @@ async function registerValidSW(swUrl: string, config?: ServiceWorkerConfig) {
   }
 }
 
-async function checkValidServiceWorker(swUrl: string, config?: ServiceWorkerConfig) {
+async function checkValidServiceWorker(
+  swUrl: string,
+  config?: ServiceWorkerConfig
+) {
   try {
     const response = await fetch(swUrl, {
       headers: { 'Service-Worker': 'script' },
     });
-    
+
     const contentType = response.headers.get('content-type');
     if (
       response.status === 404 ||
@@ -91,7 +94,9 @@ async function checkValidServiceWorker(swUrl: string, config?: ServiceWorkerConf
       registerValidSW(swUrl, config);
     }
   } catch {
-    console.log('No internet connection found. App is running in offline mode.');
+    console.log(
+      'No internet connection found. App is running in offline mode.'
+    );
   }
 }
 
@@ -111,16 +116,14 @@ export function unregister() {
 export async function clearAppCache() {
   if ('serviceWorker' in navigator && 'caches' in window) {
     const cacheNames = await caches.keys();
-    await Promise.all(
-      cacheNames.map(name => caches.delete(name))
-    );
-    
+    await Promise.all(cacheNames.map((name) => caches.delete(name)));
+
     // Notify service worker to clear its caches too
     const registration = await navigator.serviceWorker.ready;
     if (registration.active) {
       registration.active.postMessage({ type: 'CLEAR_CACHE' });
     }
-    
+
     console.log('All caches cleared');
   }
 }
@@ -129,17 +132,17 @@ export async function getCacheInfo() {
   if ('caches' in window) {
     const cacheNames = await caches.keys();
     const cacheInfo = [];
-    
+
     for (const name of cacheNames) {
       const cache = await caches.open(name);
       const keys = await cache.keys();
       cacheInfo.push({
         name,
         size: keys.length,
-        urls: keys.map(key => key.url)
+        urls: keys.map((key) => key.url),
       });
     }
-    
+
     return cacheInfo;
   }
   return [];
@@ -159,7 +162,7 @@ export function addConnectivityListeners(
     console.log('App is back online');
     if (onOnline) onOnline();
   });
-  
+
   window.addEventListener('offline', () => {
     console.log('App is offline');
     if (onOffline) onOffline();
@@ -171,7 +174,7 @@ export async function updateServiceWorker() {
   if ('serviceWorker' in navigator) {
     const registration = await navigator.serviceWorker.ready;
     await registration.update();
-    
+
     if (registration.waiting) {
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }

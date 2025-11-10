@@ -23,5 +23,5 @@ registerSW({
   },
   onOfflineReady: () => {
     console.log('VoisLab: App is ready to work offline');
-  }
+  },
 });

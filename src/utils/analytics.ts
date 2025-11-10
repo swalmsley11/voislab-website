@@ -48,7 +48,9 @@ class AnalyticsService {
   private debugMode: boolean = false;
 
   constructor() {
-    this.debugMode = ENVIRONMENT === 'dev' || localStorage.getItem('voislab-analytics-debug') === 'true';
+    this.debugMode =
+      ENVIRONMENT === 'dev' ||
+      localStorage.getItem('voislab-analytics-debug') === 'true';
     this.initialize();
   }
 
@@ -59,7 +61,9 @@ class AnalyticsService {
     if (this.isInitialized) return;
 
     // Only enable analytics in production or when explicitly enabled
-    this.isEnabled = ENVIRONMENT === 'prod' || localStorage.getItem('voislab-analytics-enabled') === 'true';
+    this.isEnabled =
+      ENVIRONMENT === 'prod' ||
+      localStorage.getItem('voislab-analytics-enabled') === 'true';
 
     if (!this.isEnabled) {
       if (this.debugMode) {
@@ -318,7 +322,11 @@ export class VoisLabAnalytics {
   }
 
   // Audio playback events
-  trackAudioPlay(trackId: string, trackTitle: string, trackGenre?: string): void {
+  trackAudioPlay(
+    trackId: string,
+    trackTitle: string,
+    trackGenre?: string
+  ): void {
     this.analytics.trackAudioEvent({
       action: 'play',
       category: 'audio',

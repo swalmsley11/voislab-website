@@ -7,11 +7,15 @@ import { voisLabAnalytics } from './analytics';
 
 // Monitoring configuration
 const MONITORING_CONFIG = {
-  errorReportingEnabled: import.meta.env.VITE_ERROR_REPORTING_ENABLED === 'true',
-  performanceMonitoringEnabled: import.meta.env.VITE_PERFORMANCE_MONITORING_ENABLED === 'true',
+  errorReportingEnabled:
+    import.meta.env.VITE_ERROR_REPORTING_ENABLED === 'true',
+  performanceMonitoringEnabled:
+    import.meta.env.VITE_PERFORMANCE_MONITORING_ENABLED === 'true',
   debugMode: import.meta.env.VITE_ENVIRONMENT === 'dev',
   sampleRate: parseFloat(import.meta.env.VITE_MONITORING_SAMPLE_RATE || '1.0'),
-  maxErrorsPerSession: parseInt(import.meta.env.VITE_MAX_ERRORS_PER_SESSION || '10'),
+  maxErrorsPerSession: parseInt(
+    import.meta.env.VITE_MAX_ERRORS_PER_SESSION || '10'
+  ),
 };
 
 // Error types
@@ -129,15 +133,16 @@ class MonitoringService {
    */
   private wrapFetch(): void {
     const originalFetch = window.fetch;
-    
+
     window.fetch = async (...args) => {
       const startTime = performance.now();
-      const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
-      
+      const url =
+        typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
+
       try {
         const response = await originalFetch(...args);
         const duration = performance.now() - startTime;
-        
+
         // Track successful requests
         this.recordPerformanceMetric({
           name: 'network_request_duration',
@@ -171,7 +176,7 @@ class MonitoringService {
         return response;
       } catch (error) {
         const duration = performance.now() - startTime;
-        
+
         this.reportError({
           type: 'network',
           message: `Network Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -205,7 +210,9 @@ class MonitoringService {
 
       // Observe different types of performance entries
       try {
-        this.performanceObserver.observe({ entryTypes: ['navigation', 'resource', 'measure', 'paint'] });
+        this.performanceObserver.observe({
+          entryTypes: ['navigation', 'resource', 'measure', 'paint'],
+        });
       } catch (error) {
         console.warn('Performance Observer not fully supported:', error);
       }
@@ -231,7 +238,7 @@ class MonitoringService {
    */
   private handlePerformanceEntry(entry: PerformanceEntry): void {
     switch (entry.entryType) {
-      case 'navigation':
+      case 'navigation': {
         const navEntry = entry as PerformanceNavigationTiming;
         this.recordPerformanceMetric({
           name: 'page_load_time',
@@ -239,15 +246,20 @@ class MonitoringService {
           unit: 'ms',
           timestamp: Date.now(),
           context: {
-            domContentLoaded: navEntry.domContentLoadedEventEnd - navEntry.fetchStart,
+            domContentLoaded:
+              navEntry.domContentLoadedEventEnd - navEntry.fetchStart,
             firstByte: navEntry.responseStart - navEntry.fetchStart,
           },
         });
         break;
+      }
 
-      case 'resource':
+      case 'resource': {
         const resourceEntry = entry as PerformanceResourceTiming;
-        if (resourceEntry.name.includes('.mp3') || resourceEntry.name.includes('.wav')) {
+        if (
+          resourceEntry.name.includes('.mp3') ||
+          resourceEntry.name.includes('.wav')
+        ) {
           this.recordPerformanceMetric({
             name: 'audio_resource_load_time',
             value: resourceEntry.duration,
@@ -260,6 +272,7 @@ class MonitoringService {
           });
         }
         break;
+      }
 
       case 'paint':
         this.recordPerformanceMetric({
@@ -276,15 +289,19 @@ class MonitoringService {
    * Record page load metrics
    */
   private recordPageLoadMetrics(): void {
-    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-    
+    const navigation = performance.getEntriesByType(
+      'navigation'
+    )[0] as PerformanceNavigationTiming;
+
     if (navigation) {
       const metrics = {
         dns_lookup: navigation.domainLookupEnd - navigation.domainLookupStart,
         tcp_connect: navigation.connectEnd - navigation.connectStart,
         request_response: navigation.responseEnd - navigation.requestStart,
-        dom_processing: navigation.domContentLoadedEventEnd - navigation.responseEnd,
-        resource_loading: navigation.loadEventEnd - navigation.domContentLoadedEventEnd,
+        dom_processing:
+          navigation.domContentLoadedEventEnd - navigation.responseEnd,
+        resource_loading:
+          navigation.loadEventEnd - navigation.domContentLoadedEventEnd,
       };
 
       Object.entries(metrics).forEach(([name, value]) => {
@@ -304,7 +321,7 @@ class MonitoringService {
   private recordMemoryMetrics(): void {
     if ('memory' in performance) {
       const memory = (performance as any).memory;
-      
+
       this.recordPerformanceMetric({
         name: 'memory_used',
         value: memory.usedJSHeapSize,
@@ -333,9 +350,12 @@ class MonitoringService {
    */
   private startHealthChecks(): void {
     // Check every 5 minutes
-    this.healthCheckInterval = window.setInterval(() => {
-      this.performHealthChecks();
-    }, 5 * 60 * 1000);
+    this.healthCheckInterval = window.setInterval(
+      () => {
+        this.performHealthChecks();
+      },
+      5 * 60 * 1000
+    );
 
     // Initial health check
     setTimeout(() => {
@@ -354,7 +374,7 @@ class MonitoringService {
     ];
 
     const results = await Promise.allSettled(healthChecks);
-    
+
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         this.recordHealthCheck(result.value);
@@ -375,7 +395,7 @@ class MonitoringService {
    */
   private async checkDynamoDBHealth(): Promise<HealthCheckResult> {
     const startTime = performance.now();
-    
+
     try {
       const { dynamoDBService } = await import('../services/dynamodb-service');
       const isHealthy = await dynamoDBService.healthCheck();
@@ -403,7 +423,7 @@ class MonitoringService {
    */
   private async checkS3Health(): Promise<HealthCheckResult> {
     const startTime = performance.now();
-    
+
     try {
       const { s3Service } = await import('../services/s3-service');
       const isHealthy = await s3Service.healthCheck();
@@ -432,7 +452,7 @@ class MonitoringService {
   private async checkCDNHealth(): Promise<HealthCheckResult> {
     const startTime = performance.now();
     const cdnDomain = import.meta.env.VITE_CLOUDFRONT_DOMAIN;
-    
+
     if (!cdnDomain) {
       return {
         service: 'cdn',
@@ -449,7 +469,7 @@ class MonitoringService {
         method: 'HEAD',
         mode: 'no-cors', // Avoid CORS issues
       });
-      
+
       const responseTime = performance.now() - startTime;
 
       return {
@@ -553,7 +573,7 @@ class MonitoringService {
   private sendToMonitoringService(type: string, data: any): void {
     // In a real implementation, this would send data to CloudWatch Logs or Metrics
     // For now, we'll just store it locally for debugging
-    
+
     const monitoringData = {
       type,
       data,
@@ -563,14 +583,16 @@ class MonitoringService {
 
     // Store in localStorage for debugging (with size limit)
     try {
-      const existingData = JSON.parse(localStorage.getItem('voislab-monitoring') || '[]');
+      const existingData = JSON.parse(
+        localStorage.getItem('voislab-monitoring') || '[]'
+      );
       existingData.push(monitoringData);
-      
+
       // Keep only last 100 entries
       if (existingData.length > 100) {
         existingData.splice(0, existingData.length - 100);
       }
-      
+
       localStorage.setItem('voislab-monitoring', JSON.stringify(existingData));
     } catch (error) {
       // Ignore localStorage errors
@@ -590,7 +612,9 @@ class MonitoringService {
       sessionId: this.sessionId,
       errorCount: this.errorCount,
       config: MONITORING_CONFIG,
-      isActive: MONITORING_CONFIG.errorReportingEnabled || MONITORING_CONFIG.performanceMonitoringEnabled,
+      isActive:
+        MONITORING_CONFIG.errorReportingEnabled ||
+        MONITORING_CONFIG.performanceMonitoringEnabled,
     };
   }
 

@@ -12,7 +12,7 @@ const CopyrightNotice: React.FC<CopyrightNoticeProps> = ({
   trackTitle,
   year = new Date().getFullYear(),
   className = '',
-  variant = 'inline'
+  variant = 'inline',
 }) => {
   const getCopyrightText = () => {
     if (trackTitle) {
@@ -29,15 +29,15 @@ const CopyrightNotice: React.FC<CopyrightNoticeProps> = ({
   };
 
   return (
-    <div className={`copyright-notice copyright-notice--${variant} ${className}`}>
+    <div
+      className={`copyright-notice copyright-notice--${variant} ${className}`}
+    >
       <div className="copyright-text">
         <span className="copyright-symbol">©</span>
         <span className="copyright-content">{getCopyrightText()}</span>
       </div>
       {variant === 'block' && (
-        <div className="license-text">
-          {getLicenseText()}
-        </div>
+        <div className="license-text">{getLicenseText()}</div>
       )}
       {variant === 'block' && (
         <div className="license-links">

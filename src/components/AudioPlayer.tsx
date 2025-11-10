@@ -49,10 +49,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
-      
+
       // Track audio completion
       voisLabAnalytics.trackAudioComplete(track.id, track.duration);
-      
+
       onTrackEnd?.();
     };
 
@@ -83,7 +83,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.removeEventListener('error', handleError);
       audio.removeEventListener('canplay', handleCanPlay);
     };
-  }, [track.secureUrl, onError, onTrackEnd]);
+  }, [track.secureUrl, track.duration, track.id, onError, onTrackEnd]);
 
   const togglePlayPause = async () => {
     const audio = audioRef.current;
@@ -93,24 +93,24 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       if (isPlaying) {
         audio.pause();
         setIsPlaying(false);
-        
+
         // Track pause event
         voisLabAnalytics.trackAudioPause(track.id, currentTime);
-        
+
         onPause?.();
       } else {
         setIsLoading(true);
         const startTime = performance.now();
-        
+
         await audio.play();
         setIsPlaying(true);
         setIsLoading(false);
-        
+
         // Track play event and load time
         const loadTime = performance.now() - startTime;
         voisLabAnalytics.trackAudioPlay(track.id, track.title, track.genre);
         voisLabAnalytics.trackAudioLoadTime(track.id, loadTime);
-        
+
         onPlay?.();
       }
     } catch (err) {
@@ -118,10 +118,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       setError(errorMessage);
       setIsLoading(false);
       setIsPlaying(false);
-      
+
       // Track audio error
       voisLabAnalytics.trackAudioError(track.id, errorMessage);
-      
+
       onError?.(errorMessage);
     }
   };

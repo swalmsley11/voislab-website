@@ -163,17 +163,30 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({
                 onChange={(e) => {
                   const newSearchTerm = e.target.value;
                   setSearchTerm(newSearchTerm);
-                  
+
                   // Track search with debouncing
                   if (newSearchTerm.length >= 3) {
                     setTimeout(() => {
                       if (newSearchTerm === searchTerm) {
                         const resultsCount = displayTracks.filter((track) => {
-                          return track.title.toLowerCase().includes(newSearchTerm.toLowerCase()) ||
-                                 track.description?.toLowerCase().includes(newSearchTerm.toLowerCase()) ||
-                                 track.tags?.some((tag) => tag.toLowerCase().includes(newSearchTerm.toLowerCase()));
+                          return (
+                            track.title
+                              .toLowerCase()
+                              .includes(newSearchTerm.toLowerCase()) ||
+                            track.description
+                              ?.toLowerCase()
+                              .includes(newSearchTerm.toLowerCase()) ||
+                            track.tags?.some((tag) =>
+                              tag
+                                .toLowerCase()
+                                .includes(newSearchTerm.toLowerCase())
+                            )
+                          );
                         }).length;
-                        voisLabAnalytics.trackSearch(newSearchTerm, resultsCount);
+                        voisLabAnalytics.trackSearch(
+                          newSearchTerm,
+                          resultsCount
+                        );
                       }
                     }, 1000);
                   }
@@ -188,7 +201,7 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({
                 onChange={(e) => {
                   const newGenre = e.target.value;
                   setSelectedGenre(newGenre);
-                  
+
                   // Track filter usage
                   if (newGenre) {
                     voisLabAnalytics.trackFilter('genre', newGenre);

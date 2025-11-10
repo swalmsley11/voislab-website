@@ -1,6 +1,7 @@
 /* Copyright Notice Styles */
 .copyright-notice {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Inline variant - for use in footers, small spaces */
@@ -95,13 +96,13 @@
   .copyright-notice--block {
     padding: 0.75rem;
   }
-  
+
   .copyright-notice--block .license-links {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
   }
-  
+
   .copyright-notice--block .separator {
     display: none;
   }
@@ -113,11 +114,11 @@
     background: #2d3748;
     border-color: #4a5568;
   }
-  
+
   .copyright-notice--block .copyright-text {
     color: #e2e8f0;
   }
-  
+
   .copyright-notice--block .license-text {
     color: #cbd5e0;
   }

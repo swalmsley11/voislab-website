@@ -94,25 +94,26 @@ const sampleTracks: AudioTrackWithUrls[] = [
 // Home page component
 const HomePage: React.FC = () => {
   const homeStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "MusicGroup",
-    "name": "VoisLab",
-    "url": "https://voislab.com",
-    "description": "Professional audio content creation and music production services specializing in ambient, electronic, and atmospheric compositions.",
-    "genre": ["Ambient", "Electronic", "Atmospheric"],
-    "sameAs": [
-      "https://open.spotify.com/artist/voislab",
-      "https://soundcloud.com/voislab",
-      "https://www.youtube.com/@voislab"
+    '@context': 'https://schema.org',
+    '@type': 'MusicGroup',
+    name: 'VoisLab',
+    url: 'https://voislab.com',
+    description:
+      'Professional audio content creation and music production services specializing in ambient, electronic, and atmospheric compositions.',
+    genre: ['Ambient', 'Electronic', 'Atmospheric'],
+    sameAs: [
+      'https://open.spotify.com/artist/voislab',
+      'https://soundcloud.com/voislab',
+      'https://www.youtube.com/@voislab',
     ],
-    "album": sampleTracks.map(track => ({
-      "@type": "MusicRecording",
-      "name": track.title,
-      "description": track.description,
-      "duration": `PT${Math.floor(track.duration / 60)}M${track.duration % 60}S`,
-      "genre": track.genre,
-      "dateCreated": track.createdDate.toISOString().split('T')[0]
-    }))
+    album: sampleTracks.map((track) => ({
+      '@type': 'MusicRecording',
+      name: track.title,
+      description: track.description,
+      duration: `PT${Math.floor(track.duration / 60)}M${track.duration % 60}S`,
+      genre: track.genre,
+      dateCreated: track.createdDate.toISOString().split('T')[0],
+    })),
   };
 
   return (
@@ -145,7 +146,7 @@ function App() {
   // Track page load performance
   React.useEffect(() => {
     const startTime = performance.now();
-    
+
     const handleLoad = () => {
       const loadTime = performance.now() - startTime;
       voisLabAnalytics.trackPageLoadTime(loadTime);
