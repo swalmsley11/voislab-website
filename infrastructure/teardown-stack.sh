@@ -15,9 +15,14 @@ NC='\033[0m'
 ENVIRONMENT=${1:-dev}
 AWS_REGION=${AWS_REGION:-us-west-2}
 
+# Ensure script is run from infrastructure directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo -e "${RED}🗑️  VoisLab Stack Teardown${NC}"
 echo -e "${YELLOW}Environment: ${ENVIRONMENT}${NC}"
 echo -e "${YELLOW}Region: ${AWS_REGION}${NC}"
+echo -e "${YELLOW}Working Directory: $(pwd)${NC}"
 echo ""
 
 print_status() {
@@ -53,26 +58,40 @@ empty_s3_buckets() {
         if aws s3 ls "s3://$bucket" >/dev/null 2>&1; then
             print_status "Emptying bucket: $bucket"
             
-            # Delete all objects and versions
+            # Delete all current objects
             aws s3 rm "s3://$bucket" --recursive 2>/dev/null || true
             
             # Delete all versions if versioning is enabled
-            aws s3api delete-objects \
+            local versions=$(aws s3api list-object-versions \
                 --bucket "$bucket" \
-                --delete "$(aws s3api list-object-versions \
-                    --bucket "$bucket" \
-                    --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
-                    --output json 2>/dev/null || echo '{}')" \
-                2>/dev/null || true
+                --query 'Versions[].{Key:Key,VersionId:VersionId}' \
+                --output json 2>/dev/null)
+            
+            if [ "$versions" != "null" ] && [ "$versions" != "[]" ] && [ -n "$versions" ]; then
+                echo "$versions" | jq -c '.[] | {Key: .Key, VersionId: .VersionId}' | while read -r obj; do
+                    aws s3api delete-object \
+                        --bucket "$bucket" \
+                        --key "$(echo "$obj" | jq -r '.Key')" \
+                        --version-id "$(echo "$obj" | jq -r '.VersionId')" \
+                        2>/dev/null || true
+                done
+            fi
             
             # Delete all delete markers
-            aws s3api delete-objects \
+            local markers=$(aws s3api list-object-versions \
                 --bucket "$bucket" \
-                --delete "$(aws s3api list-object-versions \
-                    --bucket "$bucket" \
-                    --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
-                    --output json 2>/dev/null || echo '{}')" \
-                2>/dev/null || true
+                --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' \
+                --output json 2>/dev/null)
+            
+            if [ "$markers" != "null" ] && [ "$markers" != "[]" ] && [ -n "$markers" ]; then
+                echo "$markers" | jq -c '.[] | {Key: .Key, VersionId: .VersionId}' | while read -r obj; do
+                    aws s3api delete-object \
+                        --bucket "$bucket" \
+                        --key "$(echo "$obj" | jq -r '.Key')" \
+                        --version-id "$(echo "$obj" | jq -r '.VersionId')" \
+                        2>/dev/null || true
+                done
+            fi
             
             print_success "Bucket emptied: $bucket"
         else
@@ -85,12 +104,36 @@ empty_s3_buckets() {
 destroy_stack() {
     print_status "Destroying CDK stack: VoislabWebsite-${ENVIRONMENT}..."
     
-    if cdk destroy "VoislabWebsite-${ENVIRONMENT}" --force; then
+    # Ensure we're in the infrastructure directory
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    if cdk destroy "VoislabWebsite-${ENVIRONMENT}" \
+        --context environment="${ENVIRONMENT}" \
+        --force \
+        --app "npx ts-node ${script_dir}/bin/infrastructure.ts"; then
         print_success "Stack destroyed successfully"
         return 0
     else
         print_error "Stack destruction failed"
-        return 1
+        print_warning "Attempting direct CloudFormation deletion..."
+        
+        # Fallback to direct CloudFormation deletion
+        if aws cloudformation delete-stack \
+            --stack-name "VoislabWebsite-${ENVIRONMENT}" \
+            --region "$AWS_REGION"; then
+            print_status "CloudFormation deletion initiated"
+            print_status "Waiting for stack deletion to complete..."
+            
+            aws cloudformation wait stack-delete-complete \
+                --stack-name "VoislabWebsite-${ENVIRONMENT}" \
+                --region "$AWS_REGION" 2>/dev/null || true
+            
+            print_success "Stack deleted via CloudFormation"
+            return 0
+        else
+            print_error "CloudFormation deletion also failed"
+            return 1
+        fi
     fi
 }
 
@@ -99,23 +142,49 @@ verify_cleanup() {
     print_status "Verifying cleanup..."
     
     # Check if stack still exists
-    if aws cloudformation describe-stacks \
+    local stack_status=$(aws cloudformation describe-stacks \
         --stack-name "VoislabWebsite-${ENVIRONMENT}" \
-        --region "$AWS_REGION" >/dev/null 2>&1; then
-        print_warning "Stack still exists (may be in DELETE_IN_PROGRESS state)"
-    else
+        --region "$AWS_REGION" \
+        --query 'Stacks[0].StackStatus' \
+        --output text 2>/dev/null || echo "NOT_FOUND")
+    
+    if [ "$stack_status" = "NOT_FOUND" ]; then
         print_success "Stack successfully removed"
+    elif [ "$stack_status" = "DELETE_IN_PROGRESS" ]; then
+        print_warning "Stack deletion in progress: $stack_status"
+        print_status "You can monitor progress with: aws cloudformation describe-stacks --stack-name VoislabWebsite-${ENVIRONMENT}"
+    else
+        print_warning "Stack still exists with status: $stack_status"
     fi
     
     # Check buckets
     local remaining_buckets=$(aws s3api list-buckets \
-        --query "Buckets[?contains(Name, 'voislab-${ENVIRONMENT}')].Name" \
-        --output json 2>/dev/null | jq -r '.[]' | wc -l)
+        --query "Buckets[?contains(Name, 'voislab') && contains(Name, '${ENVIRONMENT}')].Name" \
+        --output json 2>/dev/null | jq -r '.[]' 2>/dev/null)
     
-    if [ "$remaining_buckets" -gt 0 ]; then
-        print_warning "$remaining_buckets VoisLab buckets still exist"
+    if [ -n "$remaining_buckets" ]; then
+        print_warning "Some VoisLab buckets still exist:"
+        echo "$remaining_buckets" | while read -r bucket; do
+            echo "  - $bucket"
+        done
+        echo ""
+        print_status "These may be retained due to RemovalPolicy settings or deletion protection"
     else
         print_success "All VoisLab buckets removed"
+    fi
+    
+    # Check DynamoDB tables
+    local remaining_tables=$(aws dynamodb list-tables \
+        --query "TableNames[?contains(@, 'voislab') && contains(@, '${ENVIRONMENT}')]" \
+        --output json 2>/dev/null | jq -r '.[]' 2>/dev/null)
+    
+    if [ -n "$remaining_tables" ]; then
+        print_warning "Some VoisLab DynamoDB tables still exist:"
+        echo "$remaining_tables" | while read -r table; do
+            echo "  - $table"
+        done
+    else
+        print_success "All VoisLab DynamoDB tables removed"
     fi
 }
 
