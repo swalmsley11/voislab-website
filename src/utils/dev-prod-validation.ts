@@ -28,7 +28,8 @@ class DevProdValidator {
 
   constructor() {
     // Determine current environment from configuration
-    this.currentEnvironment = (import.meta.env.VITE_ENVIRONMENT as 'dev' | 'prod') || 'dev';
+    this.currentEnvironment =
+      (import.meta.env.VITE_ENVIRONMENT as 'dev' | 'prod') || 'dev';
   }
 
   /**
@@ -69,7 +70,9 @@ class DevProdValidator {
   /**
    * Validate environment configuration
    */
-  async validateEnvironmentConfiguration(): Promise<PromotionValidationResult[]> {
+  async validateEnvironmentConfiguration(): Promise<
+    PromotionValidationResult[]
+  > {
     const tests: PromotionValidationResult[] = [];
 
     // Test 1: Environment variables validation
@@ -94,7 +97,9 @@ class DevProdValidator {
           }
 
           if (missingVars.length > 0) {
-            throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
+            throw new Error(
+              `Missing environment variables: ${missingVars.join(', ')}`
+            );
           }
 
           // Validate environment-specific naming
@@ -102,14 +107,20 @@ class DevProdValidator {
           const bucketName = import.meta.env.VITE_S3_MEDIA_BUCKET;
 
           if (!tableName.includes(this.currentEnvironment)) {
-            console.warn(`Table name may not include environment: ${tableName}`);
+            console.warn(
+              `Table name may not include environment: ${tableName}`
+            );
           }
 
           if (!bucketName.includes(this.currentEnvironment)) {
-            console.warn(`Bucket name may not include environment: ${bucketName}`);
+            console.warn(
+              `Bucket name may not include environment: ${bucketName}`
+            );
           }
 
-          console.log(`Environment configuration validated for: ${this.currentEnvironment}`);
+          console.log(
+            `Environment configuration validated for: ${this.currentEnvironment}`
+          );
         }
       )
     );
@@ -121,7 +132,9 @@ class DevProdValidator {
         this.currentEnvironment,
         async () => {
           // Import services dynamically to avoid issues if not configured
-          const { dynamoDBService } = await import('../services/dynamodb-service');
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
           const { s3Service } = await import('../services/s3-service');
 
           // Test DynamoDB connectivity
@@ -136,7 +149,9 @@ class DevProdValidator {
             throw new Error('S3 health check failed');
           }
 
-          console.log(`AWS services accessible in ${this.currentEnvironment} environment`);
+          console.log(
+            `AWS services accessible in ${this.currentEnvironment} environment`
+          );
         }
       )
     );
@@ -156,41 +171,68 @@ class DevProdValidator {
         'Data Structure Validation',
         this.currentEnvironment,
         async () => {
-          const { dynamoDBService } = await import('../services/dynamodb-service');
-          
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
+
           const tracks = await dynamoDBService.getAllTracks();
-          
+
           if (tracks.length === 0) {
-            console.log(`No tracks found in ${this.currentEnvironment} environment`);
+            console.log(
+              `No tracks found in ${this.currentEnvironment} environment`
+            );
             return;
           }
 
           // Validate data structure consistency
-          const requiredFields = ['id', 'title', 'duration', 'fileUrl', 'createdDate'];
+          const requiredFields = [
+            'id',
+            'title',
+            'duration',
+            'fileUrl',
+            'createdDate',
+          ];
           const structureErrors: string[] = [];
 
-          for (const track of tracks.slice(0, 5)) { // Check first 5 tracks
+          for (const track of tracks.slice(0, 5)) {
+            // Check first 5 tracks
             for (const field of requiredFields) {
-              if (!(field in track) || track[field as keyof typeof track] === undefined) {
-                structureErrors.push(`Track ${track.id || 'unknown'} missing field: ${field}`);
+              if (
+                !(field in track) ||
+                track[field as keyof typeof track] === undefined
+              ) {
+                structureErrors.push(
+                  `Track ${track.id || 'unknown'} missing field: ${field}`
+                );
               }
             }
 
             // Validate data types
             if (typeof track.duration !== 'number' || track.duration <= 0) {
-              structureErrors.push(`Track ${track.title} has invalid duration: ${track.duration}`);
+              structureErrors.push(
+                `Track ${track.title} has invalid duration: ${track.duration}`
+              );
             }
 
-            if (!(track.createdDate instanceof Date) || isNaN(track.createdDate.getTime())) {
-              structureErrors.push(`Track ${track.title} has invalid creation date`);
+            if (
+              !(track.createdDate instanceof Date) ||
+              isNaN(track.createdDate.getTime())
+            ) {
+              structureErrors.push(
+                `Track ${track.title} has invalid creation date`
+              );
             }
           }
 
           if (structureErrors.length > 0) {
-            throw new Error(`Data structure errors: ${structureErrors.join('; ')}`);
+            throw new Error(
+              `Data structure errors: ${structureErrors.join('; ')}`
+            );
           }
 
-          console.log(`Data structure validated for ${tracks.length} tracks in ${this.currentEnvironment}`);
+          console.log(
+            `Data structure validated for ${tracks.length} tracks in ${this.currentEnvironment}`
+          );
         }
       )
     );
@@ -201,13 +243,17 @@ class DevProdValidator {
         'File Accessibility Validation',
         this.currentEnvironment,
         async () => {
-          const { dynamoDBService } = await import('../services/dynamodb-service');
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
           const { s3Service } = await import('../services/s3-service');
-          
+
           const tracks = await dynamoDBService.getAllTracks();
-          
+
           if (tracks.length === 0) {
-            console.log(`No tracks to validate in ${this.currentEnvironment} environment`);
+            console.log(
+              `No tracks to validate in ${this.currentEnvironment} environment`
+            );
             return;
           }
 
@@ -217,10 +263,14 @@ class DevProdValidator {
           for (const track of testTracks) {
             try {
               // Test URL generation
-              const secureUrl = await s3Service.getSecureAudioUrl(track.fileUrl);
-              
+              const secureUrl = await s3Service.getSecureAudioUrl(
+                track.fileUrl
+              );
+
               if (!secureUrl) {
-                accessibilityErrors.push(`No URL generated for track: ${track.title}`);
+                accessibilityErrors.push(
+                  `No URL generated for track: ${track.title}`
+                );
                 continue;
               }
 
@@ -228,9 +278,10 @@ class DevProdValidator {
               try {
                 new URL(secureUrl);
               } catch {
-                accessibilityErrors.push(`Invalid URL format for track: ${track.title}`);
+                accessibilityErrors.push(
+                  `Invalid URL format for track: ${track.title}`
+                );
               }
-
             } catch (error) {
               accessibilityErrors.push(
                 `URL generation failed for track ${track.title}: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -239,15 +290,21 @@ class DevProdValidator {
           }
 
           if (accessibilityErrors.length > 0) {
-            console.warn(`File accessibility issues: ${accessibilityErrors.join('; ')}`);
-            
+            console.warn(
+              `File accessibility issues: ${accessibilityErrors.join('; ')}`
+            );
+
             // Don't fail if it's just a few files, but fail if most files are inaccessible
             if (accessibilityErrors.length > testTracks.length * 0.7) {
-              throw new Error(`Too many file accessibility issues: ${accessibilityErrors.length}/${testTracks.length}`);
+              throw new Error(
+                `Too many file accessibility issues: ${accessibilityErrors.length}/${testTracks.length}`
+              );
             }
           }
 
-          console.log(`File accessibility validated for ${testTracks.length} tracks in ${this.currentEnvironment}`);
+          console.log(
+            `File accessibility validated for ${testTracks.length} tracks in ${this.currentEnvironment}`
+          );
         }
       )
     );
@@ -267,12 +324,16 @@ class DevProdValidator {
         'Content Quality Validation',
         this.currentEnvironment,
         async () => {
-          const { dynamoDBService } = await import('../services/dynamodb-service');
-          
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
+
           const tracks = await dynamoDBService.getAllTracks();
-          
+
           if (tracks.length === 0) {
-            console.log(`No content to validate for promotion in ${this.currentEnvironment}`);
+            console.log(
+              `No content to validate for promotion in ${this.currentEnvironment}`
+            );
             return;
           }
 
@@ -281,38 +342,58 @@ class DevProdValidator {
           for (const track of tracks) {
             // Check title quality
             if (!track.title || track.title.trim().length < 3) {
-              qualityIssues.push(`Track ${track.id} has insufficient title: "${track.title}"`);
+              qualityIssues.push(
+                `Track ${track.id} has insufficient title: "${track.title}"`
+              );
             }
 
             // Check for placeholder content
-            if (track.title.toLowerCase().includes('test') || 
-                track.title.toLowerCase().includes('sample') ||
-                track.title.toLowerCase().includes('placeholder')) {
-              qualityIssues.push(`Track ${track.title} appears to be test content`);
+            if (
+              track.title.toLowerCase().includes('test') ||
+              track.title.toLowerCase().includes('sample') ||
+              track.title.toLowerCase().includes('placeholder')
+            ) {
+              qualityIssues.push(
+                `Track ${track.title} appears to be test content`
+              );
             }
 
             // Check description quality
             if (track.description && track.description.trim().length < 10) {
-              qualityIssues.push(`Track ${track.title} has insufficient description`);
+              qualityIssues.push(
+                `Track ${track.title} has insufficient description`
+              );
             }
 
             // Check duration reasonableness
-            if (track.duration < 30) { // Less than 30 seconds
-              qualityIssues.push(`Track ${track.title} is very short: ${track.duration}s`);
+            if (track.duration < 30) {
+              // Less than 30 seconds
+              qualityIssues.push(
+                `Track ${track.title} is very short: ${track.duration}s`
+              );
             }
 
-            if (track.duration > 1800) { // More than 30 minutes
-              qualityIssues.push(`Track ${track.title} is very long: ${track.duration}s`);
+            if (track.duration > 1800) {
+              // More than 30 minutes
+              qualityIssues.push(
+                `Track ${track.title} is very long: ${track.duration}s`
+              );
             }
           }
 
           if (qualityIssues.length > 0) {
-            console.warn(`Content quality issues found: ${qualityIssues.length}`);
-            qualityIssues.slice(0, 5).forEach(issue => console.warn(`  - ${issue}`));
-            
+            console.warn(
+              `Content quality issues found: ${qualityIssues.length}`
+            );
+            qualityIssues
+              .slice(0, 5)
+              .forEach((issue) => console.warn(`  - ${issue}`));
+
             // Don't fail for minor quality issues, but warn about them
             if (qualityIssues.length > tracks.length * 0.3) {
-              throw new Error(`Too many content quality issues: ${qualityIssues.length}/${tracks.length}`);
+              throw new Error(
+                `Too many content quality issues: ${qualityIssues.length}/${tracks.length}`
+              );
             }
           }
 
@@ -327,12 +408,16 @@ class DevProdValidator {
         'Metadata Completeness Validation',
         this.currentEnvironment,
         async () => {
-          const { dynamoDBService } = await import('../services/dynamodb-service');
-          
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
+
           const tracks = await dynamoDBService.getAllTracks();
-          
+
           if (tracks.length === 0) {
-            console.log(`No metadata to validate in ${this.currentEnvironment}`);
+            console.log(
+              `No metadata to validate in ${this.currentEnvironment}`
+            );
             return;
           }
 
@@ -363,10 +448,13 @@ class DevProdValidator {
           }
 
           // Calculate completeness percentages
-          const descriptionRate = (metadataStats.withDescription / metadataStats.total) * 100;
-          const genreRate = (metadataStats.withGenre / metadataStats.total) * 100;
+          const descriptionRate =
+            (metadataStats.withDescription / metadataStats.total) * 100;
+          const genreRate =
+            (metadataStats.withGenre / metadataStats.total) * 100;
           const tagsRate = (metadataStats.withTags / metadataStats.total) * 100;
-          const streamingRate = (metadataStats.withStreamingLinks / metadataStats.total) * 100;
+          const streamingRate =
+            (metadataStats.withStreamingLinks / metadataStats.total) * 100;
 
           console.log(`Metadata completeness rates:`);
           console.log(`  Descriptions: ${descriptionRate.toFixed(1)}%`);
@@ -376,14 +464,18 @@ class DevProdValidator {
 
           // Warn if completeness is low
           if (descriptionRate < 50) {
-            console.warn(`Low description completeness: ${descriptionRate.toFixed(1)}%`);
+            console.warn(
+              `Low description completeness: ${descriptionRate.toFixed(1)}%`
+            );
           }
 
           if (genreRate < 70) {
             console.warn(`Low genre completeness: ${genreRate.toFixed(1)}%`);
           }
 
-          console.log(`Metadata completeness validated for ${tracks.length} tracks`);
+          console.log(
+            `Metadata completeness validated for ${tracks.length} tracks`
+          );
         }
       )
     );
@@ -408,7 +500,9 @@ class DevProdValidator {
           const isProduction = import.meta.env.PROD;
 
           if (this.currentEnvironment === 'prod' && isDevelopment) {
-            throw new Error('Production environment should not be running in development mode');
+            throw new Error(
+              'Production environment should not be running in development mode'
+            );
           }
 
           // Validate that required modules are available
@@ -417,13 +511,15 @@ class DevProdValidator {
             await import('../services/s3-service');
             await import('../services/streaming-platforms');
           } catch (error) {
-            throw new Error(`Required modules not available: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw new Error(
+              `Required modules not available: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
           }
 
           // Check for console errors (basic validation)
           const originalError = console.error;
           const errors: string[] = [];
-          
+
           console.error = (...args) => {
             errors.push(args.join(' '));
             originalError(...args);
@@ -434,8 +530,12 @@ class DevProdValidator {
             console.error = originalError;
           }, 1000);
 
-          console.log(`Frontend build validation completed for ${this.currentEnvironment}`);
-          console.log(`Development mode: ${isDevelopment}, Production mode: ${isProduction}`);
+          console.log(
+            `Frontend build validation completed for ${this.currentEnvironment}`
+          );
+          console.log(
+            `Development mode: ${isDevelopment}, Production mode: ${isProduction}`
+          );
         }
       )
     );
@@ -447,35 +547,44 @@ class DevProdValidator {
         this.currentEnvironment,
         async () => {
           const startTime = performance.now();
-          
+
           // Test basic operations performance
-          const { dynamoDBService } = await import('../services/dynamodb-service');
-          
+          const { dynamoDBService } = await import(
+            '../services/dynamodb-service'
+          );
+
           const tracks = await dynamoDBService.getAllTracks();
           const loadTime = performance.now() - startTime;
 
-          console.log(`Data load performance: ${loadTime.toFixed(2)}ms for ${tracks.length} tracks`);
+          console.log(
+            `Data load performance: ${loadTime.toFixed(2)}ms for ${tracks.length} tracks`
+          );
 
           // Set performance thresholds based on environment
           const maxLoadTime = this.currentEnvironment === 'prod' ? 3000 : 5000; // 3s for prod, 5s for dev
 
           if (loadTime > maxLoadTime) {
-            throw new Error(`Data load too slow: ${loadTime.toFixed(2)}ms (max: ${maxLoadTime}ms)`);
+            throw new Error(
+              `Data load too slow: ${loadTime.toFixed(2)}ms (max: ${maxLoadTime}ms)`
+            );
           }
 
           // Test memory usage (basic check)
           if ('memory' in performance) {
             const memInfo = (performance as any).memory;
             const memUsage = memInfo.usedJSHeapSize / 1024 / 1024; // MB
-            
+
             console.log(`Memory usage: ${memUsage.toFixed(2)}MB`);
-            
-            if (memUsage > 100) { // 100MB threshold
+
+            if (memUsage > 100) {
+              // 100MB threshold
               console.warn(`High memory usage: ${memUsage.toFixed(2)}MB`);
             }
           }
 
-          console.log(`Performance baseline validated for ${this.currentEnvironment}`);
+          console.log(
+            `Performance baseline validated for ${this.currentEnvironment}`
+          );
         }
       )
     );
@@ -490,7 +599,9 @@ class DevProdValidator {
     const startTime = Date.now();
     const allResults: PromotionValidationResult[] = [];
 
-    console.log(`🚀 Starting DEV to PROD Validation Suite for ${this.currentEnvironment.toUpperCase()} environment...\n`);
+    console.log(
+      `🚀 Starting DEV to PROD Validation Suite for ${this.currentEnvironment.toUpperCase()} environment...\n`
+    );
 
     // Run all validation categories
     const validationCategories = [
@@ -571,14 +682,21 @@ class DevProdValidator {
     );
 
     // Provide promotion recommendation
-    const successRate = (validationSuite.passedTests / validationSuite.totalTests) * 100;
-    
+    const successRate =
+      (validationSuite.passedTests / validationSuite.totalTests) * 100;
+
     if (successRate >= 90) {
-      console.log('\n✅ RECOMMENDATION: Environment is ready for promotion/deployment');
+      console.log(
+        '\n✅ RECOMMENDATION: Environment is ready for promotion/deployment'
+      );
     } else if (successRate >= 75) {
-      console.log('\n⚠️  RECOMMENDATION: Environment has minor issues but may be acceptable for promotion');
+      console.log(
+        '\n⚠️  RECOMMENDATION: Environment has minor issues but may be acceptable for promotion'
+      );
     } else {
-      console.log('\n❌ RECOMMENDATION: Environment has significant issues and should not be promoted');
+      console.log(
+        '\n❌ RECOMMENDATION: Environment has significant issues and should not be promoted'
+      );
     }
 
     return validationSuite;
@@ -589,6 +707,7 @@ class DevProdValidator {
 export const devProdValidator = new DevProdValidator();
 
 // Utility function to run validation from browser console
-export const runDevProdValidation = async (): Promise<PromotionValidationSuite> => {
-  return devProdValidator.runCompleteValidationSuite();
-};
+export const runDevProdValidation =
+  async (): Promise<PromotionValidationSuite> => {
+    return devProdValidator.runCompleteValidationSuite();
+  };

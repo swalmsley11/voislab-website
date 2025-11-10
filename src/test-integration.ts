@@ -15,28 +15,42 @@ import { runDevProdValidation } from './utils/dev-prod-validation';
 // Comprehensive test runner that runs all tests
 (window as any).testVoisLabComplete = async () => {
   console.log('🚀 Running Complete VoisLab Test Suite...\n');
-  
+
   try {
     console.log('1️⃣ Running Basic Integration Tests...');
     const basicResults = await runIntegrationTests();
-    
+
     console.log('\n2️⃣ Running End-to-End Tests...');
     const e2eResults = await runE2ETests();
-    
+
     console.log('\n3️⃣ Running DEV to PROD Validation...');
     const validationResults = await runDevProdValidation();
-    
+
     console.log('\n🎯 Complete Test Suite Summary:');
-    console.log(`Basic Integration: ${basicResults.passedTests}/${basicResults.totalTests} passed`);
-    console.log(`End-to-End: ${e2eResults.passedTests}/${e2eResults.totalTests} passed`);
-    console.log(`DEV/PROD Validation: ${validationResults.passedTests}/${validationResults.totalTests} passed`);
-    
-    const totalTests = basicResults.totalTests + e2eResults.totalTests + validationResults.totalTests;
-    const totalPassed = basicResults.passedTests + e2eResults.passedTests + validationResults.passedTests;
+    console.log(
+      `Basic Integration: ${basicResults.passedTests}/${basicResults.totalTests} passed`
+    );
+    console.log(
+      `End-to-End: ${e2eResults.passedTests}/${e2eResults.totalTests} passed`
+    );
+    console.log(
+      `DEV/PROD Validation: ${validationResults.passedTests}/${validationResults.totalTests} passed`
+    );
+
+    const totalTests =
+      basicResults.totalTests +
+      e2eResults.totalTests +
+      validationResults.totalTests;
+    const totalPassed =
+      basicResults.passedTests +
+      e2eResults.passedTests +
+      validationResults.passedTests;
     const overallSuccessRate = ((totalPassed / totalTests) * 100).toFixed(1);
-    
-    console.log(`\nOverall Success Rate: ${totalPassed}/${totalTests} (${overallSuccessRate}%)`);
-    
+
+    console.log(
+      `\nOverall Success Rate: ${totalPassed}/${totalTests} (${overallSuccessRate}%)`
+    );
+
     return {
       basic: basicResults,
       e2e: e2eResults,
@@ -44,8 +58,8 @@ import { runDevProdValidation } from './utils/dev-prod-validation';
       overall: {
         totalTests,
         totalPassed,
-        successRate: parseFloat(overallSuccessRate)
-      }
+        successRate: parseFloat(overallSuccessRate),
+      },
     };
   } catch (error) {
     console.error('❌ Complete test suite failed:', error);
