@@ -1,0 +1,148 @@
+/* Legal Pages Styles */
+.legal-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem 0;
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.legal-title {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.legal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  line-height: 1.6;
+}
+
+.legal-updated {
+  color: #666;
+  font-style: italic;
+  margin-bottom: 2rem;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 1rem;
+}
+
+.legal-section {
+  margin-bottom: 2rem;
+}
+
+.legal-section h2 {
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  border-left: 4px solid #667eea;
+  padding-left: 1rem;
+}
+
+.legal-section h3 {
+  color: #444;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+}
+
+.legal-section p {
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.legal-section ul,
+.legal-section ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.legal-section li {
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+
+/* License Type Styling */
+.license-type {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.license-type h3 {
+  color: #667eea;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.license-type p strong {
+  color: #764ba2;
+}
+
+/* Attribution Example */
+.attribution-example {
+  background: #f1f3f4;
+  border-left: 4px solid #667eea;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.attribution-example p {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  color: #333;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .legal-page {
+    padding: 1rem 0;
+  }
+  
+  .legal-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .legal-content {
+    padding: 1.5rem;
+    margin: 0 0.5rem;
+  }
+  
+  .legal-section h2 {
+    font-size: 1.3rem;
+  }
+  
+  .license-type {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .legal-title {
+    font-size: 1.8rem;
+  }
+  
+  .legal-content {
+    padding: 1rem;
+  }
+  
+  .legal-section h2 {
+    font-size: 1.2rem;
+  }
+}

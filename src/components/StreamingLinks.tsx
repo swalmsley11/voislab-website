@@ -6,9 +6,11 @@
 import React from 'react';
 import { StreamingPlatform } from '../types/audio-track';
 import './StreamingLinks.css';
+import { voisLabAnalytics } from '../utils/analytics';
 
 interface StreamingLinksProps {
   streamingLinks?: StreamingPlatform[];
+  trackId?: string;
   className?: string;
   showLabels?: boolean;
   size?: 'small' | 'medium' | 'large';
@@ -16,6 +18,7 @@ interface StreamingLinksProps {
 
 const StreamingLinks: React.FC<StreamingLinksProps> = ({
   streamingLinks = [],
+  trackId = '',
   className = '',
   showLabels = true,
   size = 'medium',
@@ -71,6 +74,10 @@ const StreamingLinks: React.FC<StreamingLinksProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             className="streaming-links__link"
+            onClick={() => {
+              // Track streaming link click
+              voisLabAnalytics.trackStreamingLinkClick(link.platform, trackId);
+            }}
             style={
               {
                 '--platform-color': getPlatformColor(link.platform),

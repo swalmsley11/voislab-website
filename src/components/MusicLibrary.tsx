@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import AudioPlayer from './AudioPlayer';
 import StreamingLinks from './StreamingLinks';
+import CopyrightNotice from './CopyrightNotice';
 import { useAudioTracks } from '../hooks/useAudioTracks';
 import { useTrackStreamingLinks } from '../hooks/useStreamingLinks';
 import { AudioTrackWithUrls } from '../types/audio-track';
+import { voisLabAnalytics } from '../utils/analytics';
 import './MusicLibrary.css';
 
 interface MusicLibraryProps {
@@ -158,7 +160,24 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({
                 type="text"
                 placeholder="Search tracks, descriptions, or tags..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const newSearchTerm = e.target.value;
+                  setSearchTerm(newSearchTerm);
+                  
+                  // Track search with debouncing
+                  if (newSearchTerm.length >= 3) {
+                    setTimeout(() => {
+                      if (newSearchTerm === searchTerm) {
+                        const resultsCount = displayTracks.filter((track) => {
+                          return track.title.toLowerCase().includes(newSearchTerm.toLowerCase()) ||
+                                 track.description?.toLowerCase().includes(newSearchTerm.toLowerCase()) ||
+                                 track.tags?.some((tag) => tag.toLowerCase().includes(newSearchTerm.toLowerCase()));
+                        }).length;
+                        voisLabAnalytics.trackSearch(newSearchTerm, resultsCount);
+                      }
+                    }, 1000);
+                  }
+                }}
                 className="search-input"
               />
             </div>
@@ -166,7 +185,15 @@ const MusicLibrary: React.FC<MusicLibraryProps> = ({
             <div className="filter-container">
               <select
                 value={selectedGenre}
-                onChange={(e) => setSelectedGenre(e.target.value)}
+                onChange={(e) => {
+                  const newGenre = e.target.value;
+                  setSelectedGenre(newGenre);
+                  
+                  // Track filter usage
+                  if (newGenre) {
+                    voisLabAnalytics.trackFilter('genre', newGenre);
+                  }
+                }}
                 className="genre-filter"
               >
                 <option value="">All Genres</option>
@@ -309,11 +336,21 @@ const TrackItem: React.FC<TrackItemProps> = ({
           <div className="track-streaming-links">
             <StreamingLinks
               streamingLinks={directLinks}
+              trackId={track.id}
               size="small"
               showLabels={false}
             />
           </div>
         )}
+
+        {/* Copyright Notice */}
+        <div className="track-copyright">
+          <CopyrightNotice
+            trackTitle={track.title}
+            year={new Date(track.createdDate).getFullYear()}
+            variant="minimal"
+          />
+        </div>
       </div>
       <div className="track-player">
         <AudioPlayer track={track} onPlay={onPlay} onPause={onPause} />

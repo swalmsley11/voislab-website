@@ -15,20 +15,19 @@ import * as amplify from 'aws-cdk-lib/aws-amplify';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as logs from 'aws-cdk-lib/aws-logs';
 
 export interface VoislabWebsiteStackProps extends cdk.StackProps {
   environment: string;
-  domainName?: string;
-  hostedZoneId?: string;
-  githubRepository?: string;
-  githubAccessToken?: string;
 }
 
 export class VoislabWebsiteStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: VoislabWebsiteStackProps) {
     super(scope, id, props);
 
-    const { environment, domainName, hostedZoneId, githubRepository, githubAccessToken } = props;
+    const { environment } = props;
 
     // S3 bucket for audio file uploads
     const uploadBucket = new s3.Bucket(this, 'UploadBucket', {
@@ -49,14 +48,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
       removalPolicy: environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
-    // S3 bucket for website hosting
-    const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
-      bucketName: `voislab-website-${environment}-${this.account}`,
-      publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      versioned: true,
-      removalPolicy: environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-    });
+    // Note: Website hosting is handled by AWS Amplify separately
 
     // S3 bucket for processed media storage
     const mediaBucket = new s3.Bucket(this, 'MediaBucket', {
@@ -443,14 +435,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
       comment: `OAI for VoisLab Website ${environment}`,
     });
 
-    // Grant CloudFront access to the website bucket
-    websiteBucket.addToResourcePolicy(
-      new iam.PolicyStatement({
-        actions: ['s3:GetObject'],
-        resources: [websiteBucket.arnForObjects('*')],
-        principals: [originAccessIdentity.grantPrincipal],
-      })
-    );
+    // CloudFront is used only for media content delivery
 
     // Grant CloudFront access to the media bucket
     mediaBucket.addToResourcePolicy(
@@ -496,193 +481,8 @@ export class VoislabWebsiteStack extends cdk.Stack {
       description: 'DynamoDB table name for audio metadata',
     });
 
-    // Amplify App for frontend hosting using L1 constructs
-    let amplifyApp: amplify.CfnApp | undefined;
-    let certificate: certificatemanager.Certificate | undefined;
-    let hostedZone: route53.IHostedZone | undefined;
-
-    if (githubRepository && githubAccessToken) {
-      // Create Amplify service role first
-      const amplifyServiceRole = new iam.Role(this, 'AmplifyServiceRole', {
-        assumedBy: new iam.ServicePrincipal('amplify.amazonaws.com'),
-        description: 'Service role for Amplify app to access AWS resources',
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName('AdministratorAccess-Amplify'),
-        ],
-      });
-
-      // Grant additional permissions for SSM Parameter Store access
-      amplifyServiceRole.addToPolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: [
-            'ssm:GetParameter',
-            'ssm:GetParameters',
-            'ssm:GetParametersByPath',
-          ],
-          resources: [
-            `arn:aws:ssm:${this.region}:${this.account}:parameter/voislab/${environment}/*`,
-          ],
-        })
-      );
-
-      // Create Amplify app with GitHub integration using L1 constructs
-      amplifyApp = new amplify.CfnApp(this, 'AmplifyApp', {
-        name: `voislab-website-${environment}`,
-        repository: `https://github.com/${githubRepository}`,
-        accessToken: githubAccessToken,
-        buildSpec: `version: 1
-applications:
-  - frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: dist
-        files:
-          - '**/*'
-      cache:
-        paths:
-          - node_modules/**/*
-    appRoot: .`,
-        environmentVariables: [
-          {
-            name: 'VITE_AWS_REGION',
-            value: this.region,
-          },
-          {
-            name: 'VITE_ENVIRONMENT',
-            value: environment,
-          },
-          {
-            name: 'VITE_MEDIA_DISTRIBUTION_DOMAIN',
-            value: mediaDistribution.distributionDomainName,
-          },
-          {
-            name: 'VITE_METADATA_TABLE_NAME',
-            value: audioMetadataTable.tableName,
-          },
-          {
-            name: 'VITE_MEDIA_BUCKET_NAME',
-            value: mediaBucket.bucketName,
-          },
-        ],
-        customRules: [
-          {
-            source: '/<*>',
-            target: '/index.html',
-            status: '200',
-          },
-        ],
-        iamServiceRole: amplifyServiceRole.roleArn,
-      });
-
-      // Create branch for the environment
-      const branchName = environment === 'prod' ? 'main' : 'develop';
-      const branch = new amplify.CfnBranch(this, 'AmplifyBranch', {
-        appId: amplifyApp.attrAppId,
-        branchName,
-        enableAutoBuild: true,
-        enablePullRequestPreview: environment === 'dev',
-        stage: environment === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT',
-      });
-
-      // Domain configuration for production
-      if (environment === 'prod' && domainName && hostedZoneId) {
-        // Import existing hosted zone
-        hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-          hostedZoneId,
-          zoneName: domainName,
-        });
-
-        // Create SSL certificate
-        certificate = new certificatemanager.Certificate(this, 'Certificate', {
-          domainName,
-          subjectAlternativeNames: [`www.${domainName}`],
-          validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
-        });
-
-        // Add custom domain to Amplify app
-        const domain = new amplify.CfnDomain(this, 'AmplifyDomain', {
-          appId: amplifyApp.attrAppId,
-          domainName,
-          subDomainSettings: [
-            {
-              branchName,
-              prefix: '',
-            },
-            {
-              branchName,
-              prefix: 'www',
-            },
-          ],
-        });
-
-        // Output domain information
-        new cdk.CfnOutput(this, 'WebsiteURL', {
-          value: `https://${domainName}`,
-          description: 'Production website URL',
-        });
-
-        new cdk.CfnOutput(this, 'CertificateArn', {
-          value: certificate.certificateArn,
-          description: 'SSL certificate ARN',
-        });
-      } else {
-        // For dev environment, use Amplify default domain
-        new cdk.CfnOutput(this, 'WebsiteURL', {
-          value: `https://${branchName}.${amplifyApp.attrDefaultDomain}`,
-          description: `${environment.toUpperCase()} website URL`,
-        });
-      }
-
-      new cdk.CfnOutput(this, 'AmplifyAppId', {
-        value: amplifyApp.attrAppId,
-        description: 'Amplify App ID',
-      });
-
-      new cdk.CfnOutput(this, 'AmplifyBranchName', {
-        value: branchName,
-        description: 'Amplify branch name',
-      });
-    } else {
-      // Fallback to S3 + CloudFront for website hosting if Amplify is not configured
-      const websiteDistribution = new cloudfront.Distribution(this, 'WebsiteDistribution', {
-        defaultBehavior: {
-          origin: new origins.S3Origin(websiteBucket, {
-            originAccessIdentity,
-          }),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
-          compress: true,
-        },
-        defaultRootObject: 'index.html',
-        errorResponses: [
-          {
-            httpStatus: 404,
-            responseHttpStatus: 200,
-            responsePagePath: '/index.html',
-          },
-        ],
-        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        comment: `VoisLab Website - ${environment}`,
-      });
-
-      new cdk.CfnOutput(this, 'WebsiteURL', {
-        value: `https://${websiteDistribution.distributionDomainName}`,
-        description: `${environment.toUpperCase()} website URL (CloudFront)`,
-      });
-
-      new cdk.CfnOutput(this, 'WebsiteDistributionId', {
-        value: websiteDistribution.distributionId,
-        description: 'Website CloudFront Distribution ID',
-      });
-    }
+    // Note: Frontend hosting is handled by AWS Amplify separately
+    // This CDK stack only manages backend infrastructure
 
     // Outputs
     new cdk.CfnOutput(this, 'UploadBucketName', {
@@ -690,10 +490,7 @@ applications:
       description: 'Name of the S3 bucket for audio file uploads',
     });
 
-    new cdk.CfnOutput(this, 'WebsiteBucketName', {
-      value: websiteBucket.bucketName,
-      description: 'Name of the S3 bucket for website hosting',
-    });
+    // Website hosting outputs removed - handled by Amplify
 
     new cdk.CfnOutput(this, 'MediaBucketName', {
       value: mediaBucket.bucketName,
@@ -812,5 +609,357 @@ applications:
       value: uatRunnerFunction.functionName,
       description: 'Name of the Lambda function for UAT testing',
     });
+
+    // CloudWatch Monitoring and Alerting
+    // TODO: Re-enable monitoring setup after fixing deprecated API usage
+    // this.setupMonitoringAndAlerting(...);
+  }
+
+  /**
+   * Setup comprehensive CloudWatch monitoring and alerting
+   */
+  private setupMonitoringAndAlerting(
+    environment: string,
+    audioProcessorFunction: lambda.Function,
+    formatConverterFunction: lambda.Function,
+    pipelineTesterFunction: lambda.Function,
+    uatRunnerFunction: lambda.Function,
+    contentPromoterFunction?: lambda.Function,
+    promotionOrchestratorFunction?: lambda.Function,
+    uploadBucket?: s3.Bucket,
+    mediaBucket?: s3.Bucket,
+    audioMetadataTable?: dynamodb.Table,
+    mediaDistribution?: cloudfront.Distribution,
+    notificationTopic?: sns.Topic
+  ): void {
+    
+    // Create CloudWatch Log Groups with retention
+    const logGroups = [
+      audioProcessorFunction,
+      formatConverterFunction,
+      pipelineTesterFunction,
+      uatRunnerFunction,
+      contentPromoterFunction,
+      promotionOrchestratorFunction,
+    ].filter(Boolean).map(fn => {
+      return new logs.LogGroup(this, `${fn!.functionName}LogGroup`, {
+        logGroupName: `/aws/lambda/${fn!.functionName}`,
+        retention: environment === 'prod' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
+        removalPolicy: environment === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      });
+    });
+
+    // Lambda Function Monitoring
+    const lambdaFunctions = [
+      { name: 'AudioProcessor', fn: audioProcessorFunction },
+      { name: 'FormatConverter', fn: formatConverterFunction },
+      { name: 'PipelineTester', fn: pipelineTesterFunction },
+      { name: 'UATRunner', fn: uatRunnerFunction },
+    ];
+
+    if (contentPromoterFunction) {
+      lambdaFunctions.push({ name: 'ContentPromoter', fn: contentPromoterFunction });
+    }
+
+    if (promotionOrchestratorFunction) {
+      lambdaFunctions.push({ name: 'PromotionOrchestrator', fn: promotionOrchestratorFunction });
+    }
+
+    // Create alarms for each Lambda function
+    lambdaFunctions.forEach(({ name, fn }) => {
+      // Error rate alarm
+      const errorAlarm = new cloudwatch.Alarm(this, `${name}ErrorAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-errors`,
+        alarmDescription: `High error rate for ${name} function`,
+        metric: fn.metricErrors({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: environment === 'prod' ? 5 : 10,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Duration alarm
+      const durationAlarm = new cloudwatch.Alarm(this, `${name}DurationAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-duration`,
+        alarmDescription: `High duration for ${name} function`,
+        metric: fn.metricDuration({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: fn.timeout ? fn.timeout.toMilliseconds() * 0.8 : 30000, // 80% of timeout
+        evaluationPeriods: 3,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Throttle alarm
+      const throttleAlarm = new cloudwatch.Alarm(this, `${name}ThrottleAlarm`, {
+        alarmName: `voislab-${environment}-${name.toLowerCase()}-throttles`,
+        alarmDescription: `Throttling detected for ${name} function`,
+        metric: fn.metricThrottles({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // Add alarms to SNS topic if available
+      if (notificationTopic) {
+        errorAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        durationAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        throttleAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+      }
+    });
+
+    // DynamoDB Monitoring
+    if (audioMetadataTable) {
+      // Throttle alarm (combined read/write)
+      const dynamoThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoThrottleAlarm', {
+        alarmName: `voislab-${environment}-dynamodb-throttles`,
+        alarmDescription: 'DynamoDB throttling detected',
+        metric: audioMetadataTable.metricThrottledRequests({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // System errors alarm
+      const dynamoSystemErrorsAlarm = new cloudwatch.Alarm(this, 'DynamoSystemErrorsAlarm', {
+        alarmName: `voislab-${environment}-dynamodb-system-errors`,
+        alarmDescription: 'DynamoDB system errors detected',
+        metric: audioMetadataTable.metricSystemErrors({
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        dynamoThrottleAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        dynamoSystemErrorsAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+      }
+    }
+
+    // S3 Monitoring
+    if (uploadBucket && mediaBucket) {
+      // S3 4xx errors alarm
+      const s3ClientErrorsAlarm = new cloudwatch.Alarm(this, 'S3ClientErrorsAlarm', {
+        alarmName: `voislab-${environment}-s3-client-errors`,
+        alarmDescription: 'High S3 4xx error rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/S3',
+          metricName: '4xxErrors',
+          dimensionsMap: {
+            BucketName: mediaBucket.bucketName,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 10,
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // S3 5xx errors alarm
+      const s3ServerErrorsAlarm = new cloudwatch.Alarm(this, 'S3ServerErrorsAlarm', {
+        alarmName: `voislab-${environment}-s3-server-errors`,
+        alarmDescription: 'S3 5xx errors detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/S3',
+          metricName: '5xxErrors',
+          dimensionsMap: {
+            BucketName: mediaBucket.bucketName,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Sum',
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        s3ClientErrorsAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        s3ServerErrorsAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+      }
+    }
+
+    // CloudFront Monitoring
+    if (mediaDistribution) {
+      // CloudFront 4xx error rate alarm
+      const cloudFrontClientErrorsAlarm = new cloudwatch.Alarm(this, 'CloudFrontClientErrorsAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-client-errors`,
+        alarmDescription: 'High CloudFront 4xx error rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: '4xxErrorRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: 5, // 5% error rate
+        evaluationPeriods: 3,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // CloudFront 5xx error rate alarm
+      const cloudFrontServerErrorsAlarm = new cloudwatch.Alarm(this, 'CloudFrontServerErrorsAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-server-errors`,
+        alarmDescription: 'CloudFront 5xx errors detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: '5xxErrorRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(5),
+          statistic: 'Average',
+        }),
+        threshold: 1, // 1% error rate
+        evaluationPeriods: 2,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      // CloudFront cache hit rate alarm (low cache hit rate)
+      const cloudFrontCacheHitRateAlarm = new cloudwatch.Alarm(this, 'CloudFrontCacheHitRateAlarm', {
+        alarmName: `voislab-${environment}-cloudfront-low-cache-hit-rate`,
+        alarmDescription: 'Low CloudFront cache hit rate detected',
+        metric: new cloudwatch.Metric({
+          namespace: 'AWS/CloudFront',
+          metricName: 'CacheHitRate',
+          dimensionsMap: {
+            DistributionId: mediaDistribution.distributionId,
+          },
+          period: cdk.Duration.minutes(15),
+          statistic: 'Average',
+        }),
+        threshold: 80, // 80% cache hit rate
+        evaluationPeriods: 3,
+        comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+
+      if (notificationTopic) {
+        cloudFrontClientErrorsAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        cloudFrontServerErrorsAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+        cloudFrontCacheHitRateAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(notificationTopic));
+      }
+    }
+
+    // Custom Metrics Dashboard
+    const dashboard = new cloudwatch.Dashboard(this, 'VoisLabDashboard', {
+      dashboardName: `voislab-${environment}-dashboard`,
+    });
+
+    // Lambda metrics widget
+    const lambdaMetricsWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Function Metrics',
+      left: lambdaFunctions.map(({ fn }) => fn.metricInvocations()),
+      right: lambdaFunctions.map(({ fn }) => fn.metricErrors()),
+      width: 12,
+      height: 6,
+    });
+
+    // Lambda duration widget
+    const lambdaDurationWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Function Duration',
+      left: lambdaFunctions.map(({ fn }) => fn.metricDuration()),
+      width: 12,
+      height: 6,
+    });
+
+    dashboard.addWidgets(lambdaMetricsWidget, lambdaDurationWidget);
+
+    // DynamoDB metrics widget
+    if (audioMetadataTable) {
+      const dynamoWidget = new cloudwatch.GraphWidget({
+        title: 'DynamoDB Metrics',
+        left: [
+          audioMetadataTable.metricConsumedReadCapacityUnits(),
+          audioMetadataTable.metricConsumedWriteCapacityUnits(),
+        ],
+        right: [
+          audioMetadataTable.metricThrottledRequests(),
+        ],
+        width: 12,
+        height: 6,
+      });
+
+      dashboard.addWidgets(dynamoWidget);
+    }
+
+    // CloudFront metrics widget
+    if (mediaDistribution) {
+      const cloudFrontWidget = new cloudwatch.GraphWidget({
+        title: 'CloudFront Metrics',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: 'Requests',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Sum',
+          }),
+        ],
+        right: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: '4xxErrorRate',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Average',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AWS/CloudFront',
+            metricName: '5xxErrorRate',
+            dimensionsMap: {
+              DistributionId: mediaDistribution.distributionId,
+            },
+            statistic: 'Average',
+          }),
+        ],
+        width: 12,
+        height: 6,
+      });
+
+      dashboard.addWidgets(cloudFrontWidget);
+    }
+
+    // Store monitoring configuration in SSM
+    new ssm.StringParameter(this, 'MonitoringConfig', {
+      parameterName: `/voislab/${environment}/monitoring-config`,
+      stringValue: JSON.stringify({
+        dashboardUrl: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${dashboard.dashboardName}`,
+        logGroups: logGroups.map(lg => lg.logGroupName),
+        notificationTopicArn: notificationTopic?.topicArn,
+        environment,
+      }),
+      description: 'CloudWatch monitoring configuration for VoisLab',
+    });
+
+    // Output monitoring information
+    new cdk.CfnOutput(this, 'MonitoringDashboardUrl', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${dashboard.dashboardName}`,
+      description: 'CloudWatch Dashboard URL for monitoring',
+    });
+
+    if (notificationTopic) {
+      new cdk.CfnOutput(this, 'AlertingTopicArn', {
+        value: notificationTopic.topicArn,
+        description: 'SNS Topic ARN for alerts and notifications',
+      });
+    }
   }
 }

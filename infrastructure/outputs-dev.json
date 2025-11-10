@@ -1,0 +1,18 @@
+{
+  "VoislabWebsite-dev": {
+    "PipelineTesterFunctionName": "voislab-pipeline-tester-dev",
+    "MediaBucketName": "voislab-media-dev-594205508266",
+    "FormatConverterFunctionName": "voislab-format-converter-dev",
+    "PromotionQueueUrl": "https://sqs.us-west-2.amazonaws.com/594205508266/voislab-promotion-queue-dev",
+    "NotificationTopicArn": "arn:aws:sns:us-west-2:594205508266:voislab-notifications-dev",
+    "UploadBucketName": "voislab-upload-dev-594205508266",
+    "ContentPromoterFunctionName": "voislab-content-promoter-dev",
+    "AudioProcessorFunctionName": "voislab-audio-processor-dev",
+    "MediaDistributionId": "E2KPZUPT83AQ37",
+    "PromotionOrchestratorFunctionName": "voislab-promotion-orchestrator-dev",
+    "AudioMetadataTableName": "voislab-audio-metadata-dev",
+    "MediaDistributionDomainName": "d1ycw3i5mtneq5.cloudfront.net",
+    "UATRunnerFunctionName": "voislab-uat-runner-dev",
+    "TestUtilsLayerArn": "arn:aws:lambda:us-west-2:594205508266:layer:voislab-test-utils-dev:2"
+  }
+}

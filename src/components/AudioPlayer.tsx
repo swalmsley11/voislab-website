@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AudioTrackWithUrls } from '../types/audio-track';
 import './AudioPlayer.css';
+import { voisLabAnalytics } from '../utils/analytics';
 
 interface AudioPlayerProps {
   track: AudioTrackWithUrls;
@@ -48,6 +49,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      
+      // Track audio completion
+      voisLabAnalytics.trackAudioComplete(track.id, track.duration);
+      
       onTrackEnd?.();
     };
 
@@ -88,12 +93,24 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       if (isPlaying) {
         audio.pause();
         setIsPlaying(false);
+        
+        // Track pause event
+        voisLabAnalytics.trackAudioPause(track.id, currentTime);
+        
         onPause?.();
       } else {
         setIsLoading(true);
+        const startTime = performance.now();
+        
         await audio.play();
         setIsPlaying(true);
         setIsLoading(false);
+        
+        // Track play event and load time
+        const loadTime = performance.now() - startTime;
+        voisLabAnalytics.trackAudioPlay(track.id, track.title, track.genre);
+        voisLabAnalytics.trackAudioLoadTime(track.id, loadTime);
+        
         onPlay?.();
       }
     } catch (err) {
@@ -101,6 +118,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       setError(errorMessage);
       setIsLoading(false);
       setIsPlaying(false);
+      
+      // Track audio error
+      voisLabAnalytics.trackAudioError(track.id, errorMessage);
+      
       onError?.(errorMessage);
     }
   };
