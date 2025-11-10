@@ -231,7 +231,7 @@ class MonitoringService {
    */
   private handlePerformanceEntry(entry: PerformanceEntry): void {
     switch (entry.entryType) {
-      case 'navigation':
+      case 'navigation': {
         const navEntry = entry as PerformanceNavigationTiming;
         this.recordPerformanceMetric({
           name: 'page_load_time',
@@ -244,8 +244,9 @@ class MonitoringService {
           },
         });
         break;
+      }
 
-      case 'resource':
+      case 'resource': {
         const resourceEntry = entry as PerformanceResourceTiming;
         if (resourceEntry.name.includes('.mp3') || resourceEntry.name.includes('.wav')) {
           this.recordPerformanceMetric({
@@ -260,6 +261,7 @@ class MonitoringService {
           });
         }
         break;
+      }
 
       case 'paint':
         this.recordPerformanceMetric({

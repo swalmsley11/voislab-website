@@ -83,7 +83,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.removeEventListener('error', handleError);
       audio.removeEventListener('canplay', handleCanPlay);
     };
-  }, [track.secureUrl, onError, onTrackEnd]);
+  }, [track.secureUrl, track.duration, track.id, onError, onTrackEnd]);
 
   const togglePlayPause = async () => {
     const audio = audioRef.current;
