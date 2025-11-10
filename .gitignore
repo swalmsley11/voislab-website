@@ -37,3 +37,7 @@ cdk.out/
 
 # CDK
 cdk.context.json
+outputs-*.json
+
+# Local development
+.env.local
