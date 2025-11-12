@@ -116,6 +116,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
     });
 
     // Lambda function for audio processing
+    // Note: CLOUDFRONT_DOMAIN will be added after distribution is created
     const audioProcessorFunction = new lambda.Function(this, 'AudioProcessorFunction', {
       functionName: `voislab-audio-processor-${environment}`,
       runtime: lambda.Runtime.PYTHON_3_11,
@@ -126,6 +127,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
         'MEDIA_BUCKET_NAME': mediaBucket.bucketName,
         'UPLOAD_BUCKET_NAME': uploadBucket.bucketName,
         'ENVIRONMENT': environment,
+        'CLOUDFRONT_DOMAIN': '', // Will be updated after distribution is created
       },
       timeout: cdk.Duration.minutes(10),
       memorySize: 1024,
@@ -462,6 +464,9 @@ export class VoislabWebsiteStack extends cdk.Stack {
       comment: `VoisLab Media CDN - ${environment}`,
     });
 
+    // Update Lambda environment variable with CloudFront domain
+    audioProcessorFunction.addEnvironment('CLOUDFRONT_DOMAIN', mediaDistribution.distributionDomainName);
+    
     // Store configuration in SSM Parameter Store for frontend access
     new ssm.StringParameter(this, 'MediaDistributionDomain', {
       parameterName: `/voislab/${environment}/media-distribution-domain`,
