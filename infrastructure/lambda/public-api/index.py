@@ -30,21 +30,10 @@ def handler(event, context):
     No authentication required - read-only access
     """
     
-    # Enable CORS
+    # Headers (CORS is handled by Lambda Function URL configuration)
     headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Content-Type': 'application/json'
     }
-    
-    # Handle OPTIONS request for CORS preflight
-    if event.get('requestContext', {}).get('http', {}).get('method') == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': ''
-        }
     
     try:
         # Get query parameters
