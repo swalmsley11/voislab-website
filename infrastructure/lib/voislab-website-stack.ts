@@ -486,6 +486,42 @@ export class VoislabWebsiteStack extends cdk.Stack {
       description: 'DynamoDB table name for audio metadata',
     });
 
+    // Public API Lambda for frontend access (no auth required)
+    const publicApiFunction = new lambda.Function(this, 'PublicApiFunction', {
+      functionName: `voislab-public-api-${environment}`,
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/public-api'),
+      environment: {
+        'METADATA_TABLE_NAME': audioMetadataTable.tableName,
+        'CLOUDFRONT_DOMAIN': mediaDistribution.distributionDomainName,
+        'ENVIRONMENT': environment,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+    });
+
+    // Grant read-only access to DynamoDB
+    audioMetadataTable.grantReadData(publicApiFunction);
+
+    // Create Function URL for public access
+    const publicApiFunctionUrl = publicApiFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [lambda.HttpMethod.GET],
+        allowedHeaders: ['*'],
+        maxAge: cdk.Duration.hours(1),
+      },
+    });
+
+    // Store API URL in SSM for frontend
+    new ssm.StringParameter(this, 'PublicApiUrl', {
+      parameterName: `/voislab/${environment}/public-api-url`,
+      stringValue: publicApiFunctionUrl.url,
+      description: 'Public API URL for frontend access',
+    });
+
     // Note: Frontend hosting is handled by AWS Amplify separately
     // This CDK stack only manages backend infrastructure
 
@@ -520,6 +556,12 @@ export class VoislabWebsiteStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'MediaDistributionDomainName', {
       value: mediaDistribution.distributionDomainName,
       description: 'Media CloudFront Distribution Domain Name',
+    });
+
+    new cdk.CfnOutput(this, 'PublicApiFunctionUrl', {
+      value: publicApiFunctionUrl.url,
+      description: 'Public API URL for frontend access (no auth required)',
+      exportName: `voislab-public-api-url-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'FormatConverterFunctionName', {

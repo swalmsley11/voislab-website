@@ -11,6 +11,10 @@ import {
 } from '../types/audio-track';
 import { dynamoDBService } from '../services/dynamodb-service';
 import { s3Service } from '../services/s3-service';
+import {
+  fetchTracksFromPublicApi,
+  isPublicApiAvailable,
+} from '../services/public-api-service';
 
 interface UseAudioTracksState {
   tracks: AudioTrackWithUrls[];
@@ -95,7 +99,7 @@ export const useAudioTracks = (
   );
 
   /**
-   * Fetch tracks from DynamoDB and enhance with secure URLs
+   * Fetch tracks from Public API or DynamoDB
    */
   const fetchTracks = useCallback(async (): Promise<void> => {
     try {
@@ -109,11 +113,23 @@ export const useAudioTracks = (
         return;
       }
 
-      // Fetch from DynamoDB
-      const rawTracks = await dynamoDBService.getAllTracks();
+      let enhancedTracks: AudioTrackWithUrls[];
 
-      // Enhance with secure URLs
-      const enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+      // Try public API first (no auth required)
+      if (isPublicApiAvailable()) {
+        try {
+          enhancedTracks = await fetchTracksFromPublicApi();
+        } catch (apiError) {
+          console.warn('Public API failed, falling back to direct access:', apiError);
+          // Fall back to direct DynamoDB access
+          const rawTracks = await dynamoDBService.getAllTracks();
+          enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+        }
+      } else {
+        // Use direct DynamoDB access (requires credentials)
+        const rawTracks = await dynamoDBService.getAllTracks();
+        enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+      }
 
       // Update cache
       if (enableCache) {
