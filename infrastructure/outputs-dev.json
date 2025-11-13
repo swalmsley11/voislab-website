@@ -1,5 +1,6 @@
 {
   "VoislabWebsite-dev": {
+    "PublicApiFunctionUrl": "https://lervseyf6x2vamt6c3azhpa7ve0itbxx.lambda-url.us-west-2.on.aws/",
     "PipelineTesterFunctionName": "voislab-pipeline-tester-dev",
     "MediaBucketName": "voislab-media-dev-594205508266",
     "FormatConverterFunctionName": "voislab-format-converter-dev",

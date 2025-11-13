@@ -116,6 +116,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
     });
 
     // Lambda function for audio processing
+    // Note: CLOUDFRONT_DOMAIN will be added after distribution is created
     const audioProcessorFunction = new lambda.Function(this, 'AudioProcessorFunction', {
       functionName: `voislab-audio-processor-${environment}`,
       runtime: lambda.Runtime.PYTHON_3_11,
@@ -126,6 +127,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
         'MEDIA_BUCKET_NAME': mediaBucket.bucketName,
         'UPLOAD_BUCKET_NAME': uploadBucket.bucketName,
         'ENVIRONMENT': environment,
+        'CLOUDFRONT_DOMAIN': '', // Will be updated after distribution is created
       },
       timeout: cdk.Duration.minutes(10),
       memorySize: 1024,
@@ -462,6 +464,9 @@ export class VoislabWebsiteStack extends cdk.Stack {
       comment: `VoisLab Media CDN - ${environment}`,
     });
 
+    // Update Lambda environment variable with CloudFront domain
+    audioProcessorFunction.addEnvironment('CLOUDFRONT_DOMAIN', mediaDistribution.distributionDomainName);
+    
     // Store configuration in SSM Parameter Store for frontend access
     new ssm.StringParameter(this, 'MediaDistributionDomain', {
       parameterName: `/voislab/${environment}/media-distribution-domain`,
@@ -479,6 +484,42 @@ export class VoislabWebsiteStack extends cdk.Stack {
       parameterName: `/voislab/${environment}/metadata-table-name`,
       stringValue: audioMetadataTable.tableName,
       description: 'DynamoDB table name for audio metadata',
+    });
+
+    // Public API Lambda for frontend access (no auth required)
+    const publicApiFunction = new lambda.Function(this, 'PublicApiFunction', {
+      functionName: `voislab-public-api-${environment}`,
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/public-api'),
+      environment: {
+        'METADATA_TABLE_NAME': audioMetadataTable.tableName,
+        'CLOUDFRONT_DOMAIN': mediaDistribution.distributionDomainName,
+        'ENVIRONMENT': environment,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+    });
+
+    // Grant read-only access to DynamoDB
+    audioMetadataTable.grantReadData(publicApiFunction);
+
+    // Create Function URL for public access
+    const publicApiFunctionUrl = publicApiFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [lambda.HttpMethod.GET],
+        allowedHeaders: ['*'],
+        maxAge: cdk.Duration.hours(1),
+      },
+    });
+
+    // Store API URL in SSM for frontend
+    new ssm.StringParameter(this, 'PublicApiUrl', {
+      parameterName: `/voislab/${environment}/public-api-url`,
+      stringValue: publicApiFunctionUrl.url,
+      description: 'Public API URL for frontend access',
     });
 
     // Note: Frontend hosting is handled by AWS Amplify separately
@@ -515,6 +556,12 @@ export class VoislabWebsiteStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'MediaDistributionDomainName', {
       value: mediaDistribution.distributionDomainName,
       description: 'Media CloudFront Distribution Domain Name',
+    });
+
+    new cdk.CfnOutput(this, 'PublicApiFunctionUrl', {
+      value: publicApiFunctionUrl.url,
+      description: 'Public API URL for frontend access (no auth required)',
+      exportName: `voislab-public-api-url-${environment}`,
     });
 
     new cdk.CfnOutput(this, 'FormatConverterFunctionName', {

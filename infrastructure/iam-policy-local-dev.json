@@ -1,0 +1,46 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBReadWriteAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-west-2:594205508266:table/voislab-audio-metadata-dev",
+        "arn:aws:dynamodb:us-west-2:594205508266:table/voislab-audio-metadata-dev/index/*"
+      ]
+    },
+    {
+      "Sid": "S3ReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::voislab-media-dev-594205508266",
+        "arn:aws:s3:::voislab-media-dev-594205508266/*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchLogsReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-west-2:594205508266:log-group:/aws/lambda/voislab-*"
+      ]
+    }
+  ]
+}

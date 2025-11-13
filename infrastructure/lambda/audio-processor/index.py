@@ -21,6 +21,7 @@ dynamodb = boto3.resource('dynamodb')
 METADATA_TABLE_NAME = os.environ['METADATA_TABLE_NAME']
 MEDIA_BUCKET_NAME = os.environ['MEDIA_BUCKET_NAME']
 UPLOAD_BUCKET_NAME = os.environ['UPLOAD_BUCKET_NAME']
+CLOUDFRONT_DOMAIN = os.environ.get('CLOUDFRONT_DOMAIN', '')
 
 # Audio file configuration
 SUPPORTED_FORMATS = {
@@ -231,12 +232,19 @@ class AudioProcessor:
             # Step 8: Store metadata in DynamoDB
             created_date = datetime.utcnow().isoformat()
             
+            # Generate CloudFront URL for the audio file
+            if CLOUDFRONT_DOMAIN:
+                file_url = f"https://{CLOUDFRONT_DOMAIN}/{media_key}"
+            else:
+                # Fallback to S3 URL if CloudFront not configured
+                file_url = f"https://{MEDIA_BUCKET_NAME}.s3.amazonaws.com/{media_key}"
+            
             item = {
                 'id': track_id,
                 'createdDate': created_date,
                 'title': metadata['title'],
                 'filename': filename,
-                'fileUrl': f"https://cloudfront-domain/media/{media_key}",  # Will be updated with actual domain
+                'fileUrl': file_url,
                 'fileSize': file_size,
                 'duration': metadata['duration'],
                 'format': metadata['format'],
