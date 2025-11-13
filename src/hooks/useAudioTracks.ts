@@ -120,7 +120,10 @@ export const useAudioTracks = (
         try {
           enhancedTracks = await fetchTracksFromPublicApi();
         } catch (apiError) {
-          console.warn('Public API failed, falling back to direct access:', apiError);
+          console.warn(
+            'Public API failed, falling back to direct access:',
+            apiError
+          );
           // Fall back to direct DynamoDB access
           const rawTracks = await dynamoDBService.getAllTracks();
           enhancedTracks = await enhanceTracksWithUrls(rawTracks);
