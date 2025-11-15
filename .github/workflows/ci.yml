@@ -83,6 +83,16 @@ jobs:
         working-directory: infrastructure
         run: npm ci
 
+      - name: Build metadata-enricher Lambda package
+        working-directory: infrastructure/lambda/metadata-enricher
+        run: |
+          if [ -f "build.sh" ]; then
+            chmod +x build.sh
+            ./build.sh
+          else
+            echo "⚠️ build.sh not found, skipping metadata-enricher build"
+          fi
+
       - name: Run infrastructure tests
         working-directory: infrastructure
         run: npm test
