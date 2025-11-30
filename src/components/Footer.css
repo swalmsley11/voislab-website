@@ -14,8 +14,8 @@
 
 .footer-content {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: 3rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2rem;
   margin-bottom: 2rem;
 }
 
@@ -48,6 +48,7 @@
   color: #4ecdc4;
 }
 
+.streaming-links,
 .social-links,
 .legal-links {
   display: flex;
@@ -55,6 +56,7 @@
   gap: 0.5rem;
 }
 
+.streaming-link,
 .social-link,
 .legal-link {
   color: white;
@@ -64,6 +66,7 @@
   font-size: 0.9rem;
 }
 
+.streaming-link:hover,
 .social-link:hover,
 .legal-link:hover {
   opacity: 1;
@@ -100,6 +103,7 @@
     text-align: center;
   }
 
+  .streaming-links,
   .social-links,
   .legal-links {
     flex-direction: row;
@@ -107,6 +111,7 @@
     gap: 1rem;
   }
 
+  .streaming-link:hover,
   .social-link:hover,
   .legal-link:hover {
     transform: translateY(-2px);
@@ -122,6 +127,7 @@
     gap: 1.5rem;
   }
 
+  .streaming-links,
   .social-links,
   .legal-links {
     flex-wrap: wrap;

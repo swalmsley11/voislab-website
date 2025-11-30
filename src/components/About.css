@@ -26,6 +26,30 @@
   margin-bottom: 1.5rem;
 }
 
+.about-quote {
+  font-size: 1.3rem;
+  font-style: italic;
+  color: #667eea;
+  margin: 2rem auto;
+  padding: 1.5rem 2rem;
+  border-left: 4px solid #764ba2;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  max-width: 600px;
+  position: relative;
+}
+
+.about-quote::before {
+  content: '"';
+  font-size: 3rem;
+  color: #764ba2;
+  opacity: 0.3;
+  position: absolute;
+  top: -10px;
+  left: 10px;
+  font-family: Georgia, serif;
+}
+
 @media (max-width: 768px) {
   .about {
     padding: 3rem 1.5rem;
@@ -37,5 +61,10 @@
 
   .about-container p {
     font-size: 1rem;
+  }
+
+  .about-quote {
+    font-size: 1.1rem;
+    padding: 1rem 1.5rem;
   }
 }

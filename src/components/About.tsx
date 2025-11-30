@@ -22,10 +22,10 @@ const About: React.FC<AboutProps> = ({ className = '' }) => {
           VoisLab isn't just making music—we're redefining what's possible when 
           you architect your art like you architect cloud systems.
         </p>
-        <p>
-          "I work at AWS and I'm using Bedrock Agents to run my music business 
-          while I sleep.""
-        </p>
+        <blockquote className="about-quote">
+          I work at AWS and I'm using Bedrock Agents to run my music business 
+          while I sleep.
+        </blockquote>
       </div>
     </section>
   );
