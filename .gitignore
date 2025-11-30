@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Folders
+docs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -41,3 +44,6 @@ outputs-*.json
 
 # Local development
 .env.local
+
+# Documentation
+docs/

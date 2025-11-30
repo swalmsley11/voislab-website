@@ -141,6 +141,33 @@ export class VoislabWebsiteStack extends cdk.Stack {
     // Grant Lambda permissions to write to DynamoDB
     audioMetadataTable.grantWriteData(audioProcessorFunction);
 
+    // Lambda function for metadata enrichment
+    const metadataEnricherFunction = new lambda.Function(this, 'MetadataEnricherFunction', {
+      functionName: `voislab-metadata-enricher-${environment}`,
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/metadata-enricher/metadata-enricher.zip'),
+      environment: {
+        'METADATA_TABLE_NAME': audioMetadataTable.tableName,
+        'MEDIA_BUCKET_NAME': mediaBucket.bucketName,
+        'ENVIRONMENT': environment,
+        'CLOUDFRONT_DOMAIN': '', // Will be updated after distribution is created
+      },
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 1024,
+      reservedConcurrentExecutions: environment === 'prod' ? 10 : 2,
+    });
+
+    // Grant metadata enricher permissions
+    mediaBucket.grantReadWrite(metadataEnricherFunction);
+    audioMetadataTable.grantReadWriteData(metadataEnricherFunction);
+
+    // Update audio processor to include metadata enricher function name
+    audioProcessorFunction.addEnvironment('METADATA_ENRICHER_FUNCTION', metadataEnricherFunction.functionName);
+
+    // Grant audio processor permission to invoke metadata enricher
+    metadataEnricherFunction.grantInvoke(audioProcessorFunction);
+
     // Lambda function for format conversion
     const formatConverterFunction = new lambda.Function(this, 'FormatConverterFunction', {
       functionName: `voislab-format-converter-${environment}`,
@@ -466,6 +493,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
 
     // Update Lambda environment variable with CloudFront domain
     audioProcessorFunction.addEnvironment('CLOUDFRONT_DOMAIN', mediaDistribution.distributionDomainName);
+    metadataEnricherFunction.addEnvironment('CLOUDFRONT_DOMAIN', mediaDistribution.distributionDomainName);
     
     // Store configuration in SSM Parameter Store for frontend access
     new ssm.StringParameter(this, 'MediaDistributionDomain', {
@@ -546,6 +574,11 @@ export class VoislabWebsiteStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AudioProcessorFunctionName', {
       value: audioProcessorFunction.functionName,
       description: 'Name of the Lambda function for audio processing',
+    });
+
+    new cdk.CfnOutput(this, 'MetadataEnricherFunctionName', {
+      value: metadataEnricherFunction.functionName,
+      description: 'Name of the Lambda function for metadata enrichment',
     });
 
     new cdk.CfnOutput(this, 'MediaDistributionId', {

@@ -12,24 +12,27 @@ const Hero: React.FC<HeroProps> = ({ className = '' }) => {
         <div className="hero-content">
           <h2 className="hero-title">Welcome to VoisLab</h2>
           <p className="hero-description">
-            Crafting unique audio experiences through innovative sound design
-            and music production. Explore a collection of original compositions
-            and discover the artistry behind each track. Now with automated
-            CI/CD deployment!
+            By day, I architect cloud solutions at AWS. By night, I architect
+            music—and the autonomous business that powers it. VoisLab is my
+            proving ground for agentic operations: AI agents handling
+            distribution, social media, and admin while I create. One artist.
+            Zero employees. Infinite potential.
           </p>
           <div className="hero-cta">
-            <button className="cta-button primary">Listen Now</button>
-            <button className="cta-button secondary">Learn More</button>
+            <a href="#music" className="cta-button primary">
+              Listen Now
+            </a>
+            <a href="#about" className="cta-button secondary">
+              Learn More
+            </a>
           </div>
         </div>
         <div className="hero-visual">
-          <div className="audio-wave-placeholder">
-            <div className="wave-bar"></div>
-            <div className="wave-bar"></div>
-            <div className="wave-bar"></div>
-            <div className="wave-bar"></div>
-            <div className="wave-bar"></div>
-          </div>
+          <img
+            src="/voislab-banner.jpg"
+            alt="VoisLab Banner"
+            className="hero-banner"
+          />
         </div>
       </div>
     </section>

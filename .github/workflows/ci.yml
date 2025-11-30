@@ -79,9 +79,48 @@ jobs:
           cache: 'npm'
           cache-dependency-path: infrastructure/package-lock.json
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install infrastructure dependencies
         working-directory: infrastructure
         run: npm ci
+
+      - name: Build metadata-enricher Lambda package
+        working-directory: infrastructure/lambda/metadata-enricher
+        run: |
+          echo "Building metadata-enricher Lambda package..."
+          
+          # Install mutagen
+          pip3 install -r requirements.txt \
+            --target package \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            --upgrade
+          
+          # Copy Lambda code
+          cp index.py package/
+          
+          # Create zip
+          cd package
+          zip -r ../metadata-enricher.zip . -q
+          cd ..
+          
+          # Verify zip was created
+          if [ -f "metadata-enricher.zip" ]; then
+            echo "✅ metadata-enricher.zip created successfully"
+            ls -lh metadata-enricher.zip
+          else
+            echo "❌ Failed to create metadata-enricher.zip"
+            exit 1
+          fi
+          
+          # Clean up
+          rm -rf package
 
       - name: Run infrastructure tests
         working-directory: infrastructure
@@ -167,6 +206,11 @@ jobs:
           echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "✅ AWS Account ID: $ACCOUNT_ID"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -176,6 +220,22 @@ jobs:
       - name: Install infrastructure dependencies
         working-directory: infrastructure
         run: npm ci
+
+      - name: Build metadata-enricher Lambda package
+        working-directory: infrastructure/lambda/metadata-enricher
+        run: |
+          echo "Building metadata-enricher Lambda package for deployment..."
+          pip3 install -r requirements.txt \
+            --target package \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            --upgrade
+          cp index.py package/
+          cd package && zip -r ../metadata-enricher.zip . -q && cd ..
+          rm -rf package
+          ls -lh metadata-enricher.zip
 
       - name: Deploy infrastructure to DEV
         working-directory: infrastructure
@@ -252,6 +312,11 @@ jobs:
           echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "AWS Account ID: $ACCOUNT_ID"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -261,6 +326,22 @@ jobs:
       - name: Install infrastructure dependencies
         working-directory: infrastructure
         run: npm ci
+
+      - name: Build metadata-enricher Lambda package
+        working-directory: infrastructure/lambda/metadata-enricher
+        run: |
+          echo "Building metadata-enricher Lambda package for deployment..."
+          pip3 install -r requirements.txt \
+            --target package \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            --upgrade
+          cp index.py package/
+          cd package && zip -r ../metadata-enricher.zip . -q && cd ..
+          rm -rf package
+          ls -lh metadata-enricher.zip
 
       - name: Deploy infrastructure to PROD
         working-directory: infrastructure

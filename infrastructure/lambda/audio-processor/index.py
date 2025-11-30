@@ -16,12 +16,14 @@ logger.setLevel(logging.INFO)
 # AWS clients
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
+lambda_client = boto3.client('lambda')
 
 # Environment variables
 METADATA_TABLE_NAME = os.environ['METADATA_TABLE_NAME']
 MEDIA_BUCKET_NAME = os.environ['MEDIA_BUCKET_NAME']
 UPLOAD_BUCKET_NAME = os.environ['UPLOAD_BUCKET_NAME']
 CLOUDFRONT_DOMAIN = os.environ.get('CLOUDFRONT_DOMAIN', '')
+METADATA_ENRICHER_FUNCTION = os.environ.get('METADATA_ENRICHER_FUNCTION', '')
 
 # Audio file configuration
 SUPPORTED_FORMATS = {
@@ -264,6 +266,22 @@ class AudioProcessor:
             self.table.put_item(Item=item)
             
             logger.info(f"Successfully processed {filename} -> {track_id}")
+            
+            # Trigger metadata enricher asynchronously
+            if METADATA_ENRICHER_FUNCTION:
+                try:
+                    lambda_client.invoke(
+                        FunctionName=METADATA_ENRICHER_FUNCTION,
+                        InvocationType='Event',  # Async invocation
+                        Payload=json.dumps({
+                            'trackId': track_id,
+                            's3Key': media_key
+                        })
+                    )
+                    logger.info(f"Triggered metadata enricher for track {track_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to trigger metadata enricher: {str(e)}")
+                    # Don't fail the whole process if enricher trigger fails
             
             return {
                 'trackId': track_id,

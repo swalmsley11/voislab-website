@@ -39,20 +39,27 @@ def handler(event, context):
         # Get query parameters
         query_params = event.get('queryStringParameters') or {}
         limit = int(query_params.get('limit', 100))
-        status_filter = query_params.get('status', 'processed')
+        status_filter = query_params.get('status', None)
         
         # Scan DynamoDB for tracks
         scan_params = {
             'TableName': METADATA_TABLE_NAME,
             'Limit': min(limit, 100),  # Cap at 100
-            'FilterExpression': '#status = :status',
-            'ExpressionAttributeNames': {
-                '#status': 'status'
-            },
-            'ExpressionAttributeValues': {
-                ':status': {'S': status_filter}
-            }
         }
+        
+        # Filter by status if specified, otherwise show both 'processed' and 'enhanced'
+        if status_filter:
+            scan_params['FilterExpression'] = '#status = :status'
+            scan_params['ExpressionAttributeNames'] = {'#status': 'status'}
+            scan_params['ExpressionAttributeValues'] = {':status': {'S': status_filter}}
+        else:
+            # Show both processed and enhanced tracks (exclude failed)
+            scan_params['FilterExpression'] = '#status IN (:processed, :enhanced)'
+            scan_params['ExpressionAttributeNames'] = {'#status': 'status'}
+            scan_params['ExpressionAttributeValues'] = {
+                ':processed': {'S': 'processed'},
+                ':enhanced': {'S': 'enhanced'}
+            }
         
         response = dynamodb.scan(**scan_params)
         

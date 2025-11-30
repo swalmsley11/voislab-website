@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import MusicLibrary from './components/MusicLibrary';
+import About from './components/About';
 import Footer from './components/Footer';
 import SEOHead from './components/SEOHead';
 import { AudioTrackWithUrls } from './types/audio-track';
@@ -127,7 +128,10 @@ const HomePage: React.FC = () => {
         structuredData={homeStructuredData}
       />
       <Hero />
-      <MusicLibrary fallbackTracks={sampleTracks} />
+      <section id="music">
+        <MusicLibrary fallbackTracks={sampleTracks} />
+      </section>
+      <About />
     </>
   );
 };

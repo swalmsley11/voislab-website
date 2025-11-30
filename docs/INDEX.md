@@ -39,6 +39,8 @@ Complete guide to VoisLab development, deployment, and operations.
 |----------|---------|------|----------|
 | [Integration Testing](INTEGRATION_TESTING.md) | Test deployment | 20 min | QA, Developers |
 | [Validation Results](VALIDATION_RESULTS.md) | Doc consistency checks | 5 min | All |
+| [Metadata Verification](METADATA_VERIFICATION.md) | Verify & fix metadata | 5-10 min | Operations, Developers |
+| [Metadata Enrichment](METADATA_ENRICHMENT.md) | Extract embedded tags | 10 min | All developers |
 
 ### 4. Security & Best Practices
 
@@ -70,6 +72,7 @@ Complete guide to VoisLab development, deployment, and operations.
 1. [Getting Started](GETTING_STARTED.md#troubleshooting) - Common issues
 2. [Local Development](LOCAL_DEVELOPMENT.md#common-issues) - Local dev issues
 3. [Amplify Deployment](AMPLIFY_DEPLOYMENT.md#troubleshooting) - Deployment issues
+4. [Metadata Verification](METADATA_VERIFICATION.md) - Fix metadata errors
 
 ### Cleanup
 1. [Teardown Guide](../infrastructure/TEARDOWN_GUIDE.md) - Remove resources
@@ -84,6 +87,9 @@ Complete guide to VoisLab development, deployment, and operations.
 | `validate-local-setup.sh` | Validate local environment | `./scripts/validate-local-setup.sh` |
 | `get-backend-config.sh` | Get backend configuration | `./scripts/get-backend-config.sh dev` |
 | `validate-docs-consistency.sh` | Check doc consistency | `./scripts/validate-docs-consistency.sh` |
+| `verify-metadata.sh` | Verify & fix track metadata | `./scripts/verify-metadata.sh dev` |
+| `upload-audio.sh` | Upload audio files to S3 | `./scripts/upload-audio.sh track.mp3 dev` |
+| `verify-track-processing.sh` | Verify track processing | `./scripts/verify-track-processing.sh track.mp3 dev` |
 | `deploy-backend.sh` | Deploy backend infrastructure | `cd infrastructure && ./deploy-backend.sh dev` |
 | `teardown-stack.sh` | Remove infrastructure | `cd infrastructure && ./teardown-stack.sh dev` |
 
@@ -154,6 +160,7 @@ Complete guide to VoisLab development, deployment, and operations.
 | Integration Testing | ✅ Complete | Earlier | ⚠️ Review |
 | CI/CD Setup | ✅ Complete | Earlier | ⚠️ Review |
 | Teardown Guide | ✅ Complete | 2025-11-09 | ✅ Yes |
+| Metadata Verification | ✅ Complete | 2025-11-15 | ✅ Yes |
 
 ---
 
@@ -166,6 +173,9 @@ Complete guide to VoisLab development, deployment, and operations.
 - **Deploy backend?** → [Amplify Deployment](AMPLIFY_DEPLOYMENT.md)
 - **Deploy frontend?** → [Amplify Deployment](AMPLIFY_DEPLOYMENT.md#step-2-set-up-aws-amplify-app)
 - **Test deployment?** → [Integration Testing](INTEGRATION_TESTING.md)
+- **Fix metadata errors?** → [Metadata Verification](METADATA_VERIFICATION.md)
+- **Extract embedded tags?** → [Metadata Enrichment](METADATA_ENRICHMENT.md)
+- **Upload audio files?** → [Music Upload Quickstart](MUSIC_UPLOAD_QUICKSTART.md)
 - **Security guidelines?** → [Security Best Practices](SECURITY_BEST_PRACTICES.md)
 - **Remove infrastructure?** → [Teardown Guide](../infrastructure/TEARDOWN_GUIDE.md)
 - **Daily commands?** → [Local Dev Quickstart](LOCAL_DEV_QUICKSTART.md)

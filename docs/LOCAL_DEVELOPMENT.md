@@ -200,6 +200,35 @@ npm run dev
 # 5. Open browser to http://localhost:5173
 ```
 
+### Before Committing
+
+Always run these checks before pushing code (CI will fail if these don't pass):
+
+```bash
+# Format code with Prettier
+npm run format
+
+# Check formatting (what CI runs)
+npm run format:check
+
+# Run linter
+npm run lint
+
+# Fix linting issues automatically
+npm run lint:fix
+
+# Type check
+npm run type-check
+
+# Build to ensure no errors
+npm run build
+```
+
+**Pro tip:** Run all checks at once:
+```bash
+npm run format && npm run lint && npm run type-check && npm run build
+```
+
 ### Hot Module Replacement (HMR)
 
 Vite provides instant updates when you edit files:
