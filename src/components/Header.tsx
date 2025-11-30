@@ -11,7 +11,9 @@ const Header: React.FC<HeaderProps> = ({ className = '' }) => {
       <div className="header-container">
         <div className="header-brand">
           <h1 className="header-title">VoisLab</h1>
-          <span className="header-tagline">Built different. Literally autonomous.</span>
+          <span className="header-tagline">
+            Built different. Literally autonomous.
+          </span>
         </div>
         <nav className="header-nav">
           <a href="#music" className="nav-link">

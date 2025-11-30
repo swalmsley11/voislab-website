@@ -55,6 +55,29 @@ testVoisLabComplete()
 cd infrastructure && ./deploy-backend.sh dev
 ```
 
+## Before Pushing Code
+
+**Important:** CI will fail if code isn't formatted. Run these before committing:
+
+```bash
+# Format all code (fixes formatting issues)
+npm run format
+
+# Check if formatting is correct (what CI runs)
+npm run format:check
+
+# Lint code
+npm run lint
+
+# Type check
+npm run type-check
+```
+
+**Quick check before push:**
+```bash
+npm run format && npm run lint && npm run type-check
+```
+
 ## Security Checklist
 
 - ✅ `.env.local` is git-ignored (never commit it!)
