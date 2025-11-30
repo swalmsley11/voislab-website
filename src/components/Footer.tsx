@@ -16,7 +16,7 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
           <div className="footer-section">
             <h3 className="footer-title">VoisLab</h3>
             <p className="footer-description">
-              Professional audio content creation and music production services.
+              I work at AWS and I'm using Bedrock Agents to run my music business while I sleep.
             </p>
           </div>
 
