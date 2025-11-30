@@ -127,7 +127,25 @@ const HomePage: React.FC = () => {
         structuredData={homeStructuredData}
       />
       <Hero />
-      <MusicLibrary fallbackTracks={sampleTracks} />
+      <section id="music">
+        <MusicLibrary fallbackTracks={sampleTracks} />
+      </section>
+      <section id="about" className="about-section">
+        <div className="about-container">
+          <h2>About VoisLab</h2>
+          <p>
+            VoisLab is where human creativity meets autonomous execution. Founded by a 
+            musician turned cloud architect turned independent artist, we're pioneering 
+            agentic business operations in the music industry. Using AI agents to 
+            handle everything from distribution to social media, we prove that a 
+            business of one can operate with the efficiency of many. 
+          </p>
+          <p>
+            VoisLab isn't just making music—we're redefining what's possible when you 
+            architect your art like you architect cloud systems.
+          </p>
+        </div>
+      </section>
     </>
   );
 };

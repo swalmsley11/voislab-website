@@ -158,7 +158,6 @@ const LicensingInfo: React.FC = () => {
               <h2>Contact for Licensing</h2>
               <p>Ready to license our music for your project? Get in touch:</p>
               <p>Email: licensing@voislab.com</p>
-              <p>Phone: +1 (555) 123-4567</p>
               <p>
                 Please include details about your project, intended use,
                 distribution scope, and timeline for the fastest response.

@@ -10,7 +10,7 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className={`footer ${className}`}>
+    <footer id="contact" className={`footer ${className}`}>
       <div className="footer-container">
         <div className="footer-content">
           <div className="footer-section">
@@ -23,10 +23,10 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
           <div className="footer-section">
             <h4 className="footer-heading">Connect</h4>
             <div className="social-links">
-              <a href="#" className="social-link" aria-label="Spotify">
+              <a href="https://open.spotify.com/artist/1Cp7uD6jiuEvZn5TonN2qI" className="social-link" aria-label="Spotify">
                 Spotify
               </a>
-              <a href="#" className="social-link" aria-label="SoundCloud">
+              <a href="https://music.apple.com/us/artist/voislab/1852802090" className="social-link" aria-label="Apple Music">
                 SoundCloud
               </a>
               <a href="#" className="social-link" aria-label="YouTube">
