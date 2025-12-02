@@ -18,7 +18,8 @@ const hypeCards: HypeCard[] = [
   {
     id: 'silicon-horizon-amazon',
     imageUrl: '/images/hype_silicon-horizion_amazon-music.png',
-    linkUrl: 'https://music.amazon.com/albums/B0G279V8SV?ref=AM4APC_TR_S_en_US_B0G27P62RR_lmIHs0C&trackAsin=B0G275NK6V',
+    linkUrl:
+      'https://music.amazon.com/albums/B0G279V8SV?ref=AM4APC_TR_S_en_US_B0G27P62RR_lmIHs0C&trackAsin=B0G275NK6V',
     altText: 'Silicon Horizon on Amazon Music',
   },
   {
