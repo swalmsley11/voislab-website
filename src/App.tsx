@@ -4,15 +4,46 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import MusicLibrary from './components/MusicLibrary';
+import NewReleases from './components/NewReleases';
 import About from './components/About';
 import Footer from './components/Footer';
 import SEOHead from './components/SEOHead';
 import { AudioTrackWithUrls } from './types/audio-track';
 
-// Lazy load legal pages for better performance
+// Lazy load pages for better performance
 const PrivacyPolicy = React.lazy(() => import('./components/PrivacyPolicy'));
 const TermsOfUse = React.lazy(() => import('./components/TermsOfUse'));
 const LicensingInfo = React.lazy(() => import('./components/LicensingInfo'));
+
+// Music Library Page component
+const MusicLibraryPage: React.FC = () => {
+  const musicLibraryStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'MusicPlaylist',
+    name: 'VoisLab Music Library',
+    description:
+      'Browse the complete collection of original compositions and audio creations by VoisLab.',
+    url: 'https://voislab.com/music',
+    creator: {
+      '@type': 'MusicGroup',
+      name: 'VoisLab',
+    },
+  };
+
+  return (
+    <>
+      <SEOHead
+        title="Music Library - VoisLab"
+        description="Browse the complete collection of original compositions and audio creations by VoisLab. Stream high-quality ambient, electronic, and atmospheric tracks."
+        keywords="VoisLab music library, ambient music, electronic music, original compositions, streaming, music catalog"
+        url="https://voislab.com/music"
+        type="website"
+        structuredData={musicLibraryStructuredData}
+      />
+      <MusicLibrary fallbackTracks={sampleTracks} />
+    </>
+  );
+};
 
 // Import test integration for development
 import './test-integration';
@@ -128,9 +159,7 @@ const HomePage: React.FC = () => {
         structuredData={homeStructuredData}
       />
       <Hero />
-      <section id="music">
-        <MusicLibrary fallbackTracks={sampleTracks} />
-      </section>
+      <NewReleases />
       <About />
     </>
   );
@@ -177,6 +206,7 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/music" element={<MusicLibraryPage />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/licensing" element={<LicensingInfo />} />
