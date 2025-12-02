@@ -59,7 +59,7 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
             <h4 className="footer-heading">Social</h4>
             <div className="social-links">
               <a
-                href="https://x.com/voislab_ai"
+                href="https://x.com/swalmsley11"
                 className="social-link"
                 aria-label="X (Twitter)"
                 target="_blank"
@@ -86,7 +86,7 @@ const Footer: React.FC<FooterProps> = ({ className = '' }) => {
                 TikTok
               </a>
               <a
-                href="#"
+                href="https://www.instagram.com/swalmsley11"
                 className="social-link"
                 aria-label="Instagram"
                 target="_blank"

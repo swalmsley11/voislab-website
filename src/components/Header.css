@@ -24,6 +24,10 @@
   align-items: flex-start;
 }
 
+.brand-link {
+  text-decoration: none;
+}
+
 .header-title {
   font-size: 2rem;
   font-weight: 700;
