@@ -23,10 +23,10 @@ const hypeCards: HypeCard[] = [
     altText: 'Silicon Horizon on Amazon Music',
   },
   {
-    id: 'i-forgive-you-apple',
-    imageUrl: '/images/hype_i-forgive-you_apple-music.png',
-    linkUrl: 'https://music.lnk.to/1kV0Qs',
-    altText: 'I Forgive You on Apple Music',
+    id: 'blocks-of-sorrow-apple',
+    imageUrl: '/images/hype_blocks-of-sorrow_apple-music.png',
+    linkUrl: 'https://music.lnk.to/F5oat6',
+    altText: 'Blocks of Sorrow on Apple Music',
   },
 ];
 
