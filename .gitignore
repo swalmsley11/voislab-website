@@ -47,3 +47,6 @@ outputs-*.json
 
 # Documentation
 docs/
+
+# Kiro IDE configuration
+.kiro/
