@@ -13,20 +13,20 @@ const hypeCards: HypeCard[] = [
     id: 'voislab-spotify',
     imageUrl: '/images/hype_voislab-spotify.jpeg',
     linkUrl: 'https://open.spotify.com/artist/1Cp7uD6jiuEvZn5TonN2qI',
-    altText: 'Silicon Horizon on Amazon Music',
+    altText: 'VoisLab on Spotify',
   },
   {
-    id: 'silicon-horizon-amazon',
-    imageUrl: '/images/hype_silicon-horizion_amazon-music.png',
+    id: 'human-in-the-loop-youtube',
+    imageUrl: '/images/hype_human-in-the-loop.png',
     linkUrl:
-      'https://music.amazon.com/albums/B0G279V8SV?ref=AM4APC_TR_S_en_US_B0G27P62RR_lmIHs0C&trackAsin=B0G275NK6V',
-    altText: 'Silicon Horizon on Amazon Music',
+      'https://music.youtube.com/playlist?list=OLAK5uy_n2fdXFgysXC-6QG0F1s1CR9LU8WeJbNXY',
+    altText: 'Human in the Loop on YouTube Music',
   },
   {
-    id: 'i-forgive-you-apple',
-    imageUrl: '/images/hype_i-forgive-you_apple-music.png',
-    linkUrl: 'https://music.lnk.to/1kV0Qs',
-    altText: 'I Forgive You on Apple Music',
+    id: 'blocks-of-sorrow-apple',
+    imageUrl: '/images/hype_blocks-of-sorrow_apple-music.png',
+    linkUrl: 'https://music.lnk.to/F5oat6',
+    altText: 'Blocks of Sorrow on Apple Music',
   },
 ];
 
