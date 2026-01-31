@@ -1,20 +1,10 @@
 /**
  * useAudioTracks Hook
- * Manages fetching and caching of audio track metadata from DynamoDB
+ * Simplified version that only uses the public API
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  AudioTrack,
-  AudioTrackWithUrls,
-  AudioError,
-} from '../types/audio-track';
-import { dynamoDBService } from '../services/dynamodb-service';
-import { s3Service } from '../services/s3-service';
-import {
-  fetchTracksFromPublicApi,
-  isPublicApiAvailable,
-} from '../services/public-api-service';
+import { AudioTrackWithUrls, AudioError } from '../types/audio-track';
 
 interface UseAudioTracksState {
   tracks: AudioTrackWithUrls[];
@@ -27,7 +17,7 @@ interface UseAudioTracksState {
 
 interface UseAudioTracksOptions {
   enableCache?: boolean;
-  cacheTimeout?: number; // in milliseconds
+  cacheTimeout?: number;
 }
 
 // Simple in-memory cache
@@ -41,7 +31,7 @@ let cache: CacheEntry | null = null;
 export const useAudioTracks = (
   options: UseAudioTracksOptions = {}
 ): UseAudioTracksState => {
-  const { enableCache = true, cacheTimeout = 5 * 60 * 1000 } = options; // 5 minutes default
+  const { enableCache = true, cacheTimeout = 5 * 60 * 1000 } = options;
 
   const [tracks, setTracks] = useState<AudioTrackWithUrls[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -56,50 +46,7 @@ export const useAudioTracks = (
   }, [enableCache, cacheTimeout]);
 
   /**
-   * Enhance tracks with secure URLs
-   */
-  const enhanceTracksWithUrls = useCallback(
-    async (rawTracks: AudioTrack[]): Promise<AudioTrackWithUrls[]> => {
-      const enhancedTracks: AudioTrackWithUrls[] = [];
-
-      for (const track of rawTracks) {
-        try {
-          // Extract the S3 key from the fileUrl (assuming it's stored as a key or full URL)
-          const s3Key = track.fileUrl.includes('://')
-            ? track.fileUrl.split('/').pop() || track.fileUrl
-            : track.fileUrl;
-
-          // Get secure URLs with fallbacks
-          const urlData = await s3Service.getAudioUrlsWithFallbacks(
-            s3Key.replace(/\.[^/.]+$/, '')
-          );
-
-          enhancedTracks.push({
-            ...track,
-            secureUrl: urlData.primary,
-            fallbackUrls: urlData.fallbacks,
-          });
-        } catch (urlError) {
-          console.warn(
-            `Failed to generate secure URL for track ${track.id}:`,
-            urlError
-          );
-          // Include track with original URL as fallback
-          enhancedTracks.push({
-            ...track,
-            secureUrl: track.fileUrl,
-            fallbackUrls: [],
-          });
-        }
-      }
-
-      return enhancedTracks;
-    },
-    []
-  );
-
-  /**
-   * Fetch tracks from Public API or DynamoDB
+   * Fetch tracks from Public API only
    */
   const fetchTracks = useCallback(async (): Promise<void> => {
     try {
@@ -113,61 +60,54 @@ export const useAudioTracks = (
         return;
       }
 
-      let enhancedTracks: AudioTrackWithUrls[];
-
-      // Try public API first (no auth required)
-      if (isPublicApiAvailable()) {
-        try {
-          enhancedTracks = await fetchTracksFromPublicApi();
-        } catch (apiError) {
-          console.warn(
-            'Public API failed, checking if direct access is available:',
-            apiError
-          );
-          // Only fall back to direct DynamoDB access if credentials are available
-          const hasCredentials = import.meta.env.VITE_AWS_ACCESS_KEY_ID && 
-                                import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
-          
-          if (hasCredentials) {
-            try {
-              const rawTracks = await dynamoDBService.getAllTracks();
-              enhancedTracks = await enhanceTracksWithUrls(rawTracks);
-            } catch (directAccessError) {
-              console.warn('Direct AWS access also failed:', directAccessError);
-              // If both API and direct access fail, return empty array
-              // The component will use fallback tracks
-              enhancedTracks = [];
-            }
-          } else {
-            console.warn('No AWS credentials available for direct access, using fallback');
-            // Return empty array to trigger fallback tracks in component
-            enhancedTracks = [];
-          }
-        }
-      } else {
-        // Check if credentials are available for direct access
-        const hasCredentials = import.meta.env.VITE_AWS_ACCESS_KEY_ID && 
-                              import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
-        
-        if (hasCredentials) {
-          const rawTracks = await dynamoDBService.getAllTracks();
-          enhancedTracks = await enhanceTracksWithUrls(rawTracks);
-        } else {
-          console.warn('No public API URL and no AWS credentials, using fallback');
-          // Return empty array to trigger fallback tracks in component
-          enhancedTracks = [];
-        }
+      // Get API URL from environment
+      const apiUrl = import.meta.env.VITE_PUBLIC_API_URL;
+      
+      if (!apiUrl) {
+        throw new Error('API URL not configured');
       }
+
+      console.log('Fetching tracks from:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
+
+      // Transform the data to match AudioTrackWithUrls interface
+      const tracks: AudioTrackWithUrls[] = (data.tracks || []).map((track: any) => ({
+        id: track.id,
+        title: track.title,
+        fileUrl: track.fileUrl || '',
+        secureUrl: track.fileUrl || '', // Use the same URL (CloudFront)
+        duration: track.duration || 0,
+        description: track.description || '',
+        createdDate: new Date(track.createdDate),
+        genre: track.genre || 'Unknown',
+        tags: track.tags || [],
+        streamingLinks: track.streamingLinks || [],
+      }));
 
       // Update cache
       if (enableCache) {
         cache = {
-          data: enhancedTracks,
+          data: tracks,
           timestamp: Date.now(),
         };
       }
 
-      setTracks(enhancedTracks);
+      setTracks(tracks);
+      console.log('Successfully loaded', tracks.length, 'tracks');
+
     } catch (err) {
       console.error('Error fetching tracks:', err);
       const audioError: AudioError = {
@@ -175,10 +115,11 @@ export const useAudioTracks = (
         message: err instanceof Error ? err.message : 'Failed to fetch tracks',
       };
       setError(audioError);
+      // Don't set empty tracks on error - let the component handle fallbacks
     } finally {
       setLoading(false);
     }
-  }, [enhanceTracksWithUrls, enableCache, isCacheValid]);
+  }, [enableCache, isCacheValid]);
 
   /**
    * Get track by ID

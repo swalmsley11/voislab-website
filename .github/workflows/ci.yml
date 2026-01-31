@@ -1,20 +1,17 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (DISABLED)
 
+# Temporarily disabled - using Amplify auto-deployment instead
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to deploy to'
+      force_run:
+        description: 'Force run this workflow (normally disabled)'
         required: true
-        default: 'development'
+        default: 'false'
         type: choice
         options:
-        - development
-        - production
+        - 'false'
+        - 'true'
 
 env:
   NODE_VERSION: '18'
