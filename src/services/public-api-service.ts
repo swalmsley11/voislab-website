@@ -5,7 +5,7 @@
 
 import { AudioTrackWithUrls } from '../types/audio-track';
 
-const PUBLIC_API_URL = import.meta.env.VITE_PUBLIC_API_URL || 'https://ujgiy4p7xwuvfizeqr5pcahvj40hxhpa.lambda-url.us-west-2.on.aws/tracks';
+const PUBLIC_API_URL = import.meta.env.VITE_PUBLIC_API_URL;
 
 export interface FetchTracksOptions {
   limit?: number;
