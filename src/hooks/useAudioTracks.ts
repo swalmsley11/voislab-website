@@ -121,17 +121,42 @@ export const useAudioTracks = (
           enhancedTracks = await fetchTracksFromPublicApi();
         } catch (apiError) {
           console.warn(
-            'Public API failed, falling back to direct access:',
+            'Public API failed, checking if direct access is available:',
             apiError
           );
-          // Fall back to direct DynamoDB access
-          const rawTracks = await dynamoDBService.getAllTracks();
-          enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+          // Only fall back to direct DynamoDB access if credentials are available
+          const hasCredentials = import.meta.env.VITE_AWS_ACCESS_KEY_ID && 
+                                import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+          
+          if (hasCredentials) {
+            try {
+              const rawTracks = await dynamoDBService.getAllTracks();
+              enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+            } catch (directAccessError) {
+              console.warn('Direct AWS access also failed:', directAccessError);
+              // If both API and direct access fail, return empty array
+              // The component will use fallback tracks
+              enhancedTracks = [];
+            }
+          } else {
+            console.warn('No AWS credentials available for direct access, using fallback');
+            // Return empty array to trigger fallback tracks in component
+            enhancedTracks = [];
+          }
         }
       } else {
-        // Use direct DynamoDB access (requires credentials)
-        const rawTracks = await dynamoDBService.getAllTracks();
-        enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+        // Check if credentials are available for direct access
+        const hasCredentials = import.meta.env.VITE_AWS_ACCESS_KEY_ID && 
+                              import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+        
+        if (hasCredentials) {
+          const rawTracks = await dynamoDBService.getAllTracks();
+          enhancedTracks = await enhanceTracksWithUrls(rawTracks);
+        } else {
+          console.warn('No public API URL and no AWS credentials, using fallback');
+          // Return empty array to trigger fallback tracks in component
+          enhancedTracks = [];
+        }
       }
 
       // Update cache
