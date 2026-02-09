@@ -46,7 +46,8 @@ const MusicLibraryPage: React.FC = () => {
 };
 
 // Import test integration for development
-import './test-integration';
+// TEMPORARILY DISABLED: Tests use deprecated AWS SDK services
+// import './test-integration';
 
 // Import analytics and monitoring
 import { voisLabAnalytics } from './utils/analytics';

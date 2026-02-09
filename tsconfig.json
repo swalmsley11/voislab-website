@@ -21,5 +21,11 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  "exclude": [
+    "src/utils/dev-prod-validation.ts",
+    "src/utils/end-to-end-integration.ts",
+    "src/utils/integration-test.ts",
+    "src/test-integration.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
