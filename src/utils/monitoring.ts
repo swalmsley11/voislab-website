@@ -42,21 +42,10 @@ export interface PerformanceMetric {
   context?: Record<string, any>;
 }
 
-// Health check result
-export interface HealthCheckResult {
-  service: string;
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  responseTime: number;
-  timestamp: number;
-  error?: string;
-  details?: Record<string, any>;
-}
-
 class MonitoringService {
   private sessionId: string;
   private errorCount: number = 0;
   private performanceObserver?: PerformanceObserver;
-  private healthCheckInterval?: number;
 
   constructor() {
     this.sessionId = this.generateSessionId();
@@ -74,9 +63,6 @@ class MonitoringService {
     if (MONITORING_CONFIG.performanceMonitoringEnabled) {
       this.setupPerformanceMonitoring();
     }
-
-    // Start health checks
-    this.startHealthChecks();
 
     if (MONITORING_CONFIG.debugMode) {
       console.log('🔍 Monitoring service initialized', {
@@ -346,148 +332,14 @@ class MonitoringService {
   }
 
   /**
-   * Start health checks for critical services
+   * NOTE: Health checks removed from client-side code.
+   * Health monitoring should be done at the infrastructure level using:
+   * - CloudWatch Alarms for CloudFront/S3/DynamoDB metrics
+   * - Route53 Health Checks for active monitoring
+   * - AWS CloudWatch Synthetics for synthetic monitoring
+   * 
+   * Client-side health checks waste resources and provide false signals.
    */
-  private startHealthChecks(): void {
-    // Check every 5 minutes
-    this.healthCheckInterval = window.setInterval(
-      () => {
-        this.performHealthChecks();
-      },
-      5 * 60 * 1000
-    );
-
-    // Initial health check
-    setTimeout(() => {
-      this.performHealthChecks();
-    }, 10000); // Wait 10 seconds after page load
-  }
-
-  /**
-   * Perform health checks on critical services
-   */
-  private async performHealthChecks(): Promise<void> {
-    const healthChecks = [
-      this.checkDynamoDBHealth(),
-      this.checkS3Health(),
-      this.checkCDNHealth(),
-    ];
-
-    const results = await Promise.allSettled(healthChecks);
-
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        this.recordHealthCheck(result.value);
-      } else {
-        this.recordHealthCheck({
-          service: ['dynamodb', 's3', 'cdn'][index],
-          status: 'unhealthy',
-          responseTime: 0,
-          timestamp: Date.now(),
-          error: result.reason?.message || 'Health check failed',
-        });
-      }
-    });
-  }
-
-  /**
-   * Check DynamoDB health
-   */
-  private async checkDynamoDBHealth(): Promise<HealthCheckResult> {
-    const startTime = performance.now();
-
-    try {
-      const { dynamoDBService } = await import('../services/dynamodb-service');
-      const isHealthy = await dynamoDBService.healthCheck();
-      const responseTime = performance.now() - startTime;
-
-      return {
-        service: 'dynamodb',
-        status: isHealthy ? 'healthy' : 'degraded',
-        responseTime,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        service: 'dynamodb',
-        status: 'unhealthy',
-        responseTime: performance.now() - startTime,
-        timestamp: Date.now(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
-  /**
-   * Check S3 health
-   */
-  private async checkS3Health(): Promise<HealthCheckResult> {
-    const startTime = performance.now();
-
-    try {
-      const { s3Service } = await import('../services/s3-service');
-      const isHealthy = await s3Service.healthCheck();
-      const responseTime = performance.now() - startTime;
-
-      return {
-        service: 's3',
-        status: isHealthy ? 'healthy' : 'degraded',
-        responseTime,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        service: 's3',
-        status: 'unhealthy',
-        responseTime: performance.now() - startTime,
-        timestamp: Date.now(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
-  /**
-   * Check CDN health (basic connectivity test)
-   */
-  private async checkCDNHealth(): Promise<HealthCheckResult> {
-    const startTime = performance.now();
-    const cdnDomain = import.meta.env.VITE_CLOUDFRONT_DOMAIN;
-
-    if (!cdnDomain) {
-      return {
-        service: 'cdn',
-        status: 'healthy', // No CDN configured is not an error
-        responseTime: 0,
-        timestamp: Date.now(),
-        details: { message: 'CDN not configured' },
-      };
-    }
-
-    try {
-      // Simple HEAD request to check CDN availability
-      await fetch(`https://${cdnDomain}/health-check`, {
-        method: 'HEAD',
-        mode: 'no-cors', // Avoid CORS issues
-      });
-
-      const responseTime = performance.now() - startTime;
-
-      return {
-        service: 'cdn',
-        status: 'healthy',
-        responseTime,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        service: 'cdn',
-        status: 'degraded', // CDN issues are often temporary
-        responseTime: performance.now() - startTime,
-        timestamp: Date.now(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
 
   /**
    * Report an error
@@ -541,31 +393,7 @@ class MonitoringService {
     this.sendToMonitoringService('metric', metric);
   }
 
-  /**
-   * Record a health check result
-   */
-  recordHealthCheck(result: HealthCheckResult): void {
-    // Send to analytics
-    voisLabAnalytics.trackPerformance({
-      action: 'health_check',
-      category: 'monitoring',
-      label: result.service,
-      value: Math.round(result.responseTime),
-      custom_parameters: {
-        service: result.service,
-        status: result.status,
-        error: result.error,
-      },
-    });
 
-    // Log to console in debug mode
-    if (MONITORING_CONFIG.debugMode) {
-      console.log('🔍 Health Check:', result);
-    }
-
-    // Send to monitoring service
-    this.sendToMonitoringService('health_check', result);
-  }
 
   /**
    * Send data to monitoring service (placeholder for CloudWatch integration)
@@ -642,10 +470,6 @@ class MonitoringService {
   cleanup(): void {
     if (this.performanceObserver) {
       this.performanceObserver.disconnect();
-    }
-
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
     }
   }
 }
