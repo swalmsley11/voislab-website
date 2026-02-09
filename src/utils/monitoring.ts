@@ -33,6 +33,8 @@ export interface MonitoringError {
   context?: Record<string, any>;
 }
 
+// Performance metrics
+export interface PerformanceMetric {
   name: string;
   value: number;
   unit: 'ms' | 'bytes' | 'count' | 'percent';
