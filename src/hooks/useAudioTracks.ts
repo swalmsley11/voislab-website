@@ -1,10 +1,21 @@
 /**
- * useAudioTracks Hook
- * Simplified version that only uses the public API
+ * useAudioTracks Hook - Simplified and Secure
+ * 
+ * This hook implements the lessons learned from the music upload task:
+ * 
+ * SECURITY IMPROVEMENTS:
+ * - Only uses public API (no AWS SDK calls)
+ * - No credentials in frontend code
+ * 
+ * ARCHITECTURE IMPROVEMENTS:
+ * - Simple, single-responsibility approach
+ * - Clear error handling without complex fallbacks
+ * - Transparent user feedback
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { AudioTrackWithUrls, AudioError } from '../types/audio-track';
+import { fetchTracksFromPublicApi, isPublicApiAvailable, getApiUrl } from '../services/public-api-service';
 
 interface UseAudioTracksState {
   tracks: AudioTrackWithUrls[];
@@ -46,7 +57,7 @@ export const useAudioTracks = (
   }, [enableCache, cacheTimeout]);
 
   /**
-   * Fetch tracks from Public API only
+   * Fetch tracks using the simplified, secure approach
    */
   const fetchTracks = useCallback(async (): Promise<void> => {
     try {
@@ -55,67 +66,49 @@ export const useAudioTracks = (
 
       // Check cache first
       if (isCacheValid() && cache) {
+        console.log('Using cached tracks data');
         setTracks(cache.data);
         setLoading(false);
         return;
       }
 
-      // Get API URL from environment
-      const apiUrl = import.meta.env.VITE_PUBLIC_API_URL;
-      
-      if (!apiUrl) {
-        throw new Error('API URL not configured');
+      // Check if API is properly configured
+      if (!isPublicApiAvailable()) {
+        throw new Error('Music service is not properly configured. Please check environment setup.');
       }
 
-      console.log('Fetching tracks from:', apiUrl);
+      console.log('Fetching tracks from API:', getApiUrl());
 
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Fetch from public API (the ONLY data source)
+      const fetchedTracks = await fetchTracksFromPublicApi({
+        limit: 100,
+        status: 'processed'
       });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('API response:', data);
-
-      // Transform the data to match AudioTrackWithUrls interface
-      const tracks: AudioTrackWithUrls[] = (data.tracks || []).map((track: any) => ({
-        id: track.id,
-        title: track.title,
-        fileUrl: track.fileUrl || '',
-        secureUrl: track.fileUrl || '', // Use the same URL (CloudFront)
-        duration: track.duration || 0,
-        description: track.description || '',
-        createdDate: new Date(track.createdDate),
-        genre: track.genre || 'Unknown',
-        tags: track.tags || [],
-        streamingLinks: track.streamingLinks || [],
-      }));
 
       // Update cache
       if (enableCache) {
         cache = {
-          data: tracks,
+          data: fetchedTracks,
           timestamp: Date.now(),
         };
       }
 
-      setTracks(tracks);
-      console.log('Successfully loaded', tracks.length, 'tracks');
+      setTracks(fetchedTracks);
+      console.log('Successfully loaded', fetchedTracks.length, 'tracks');
 
     } catch (err) {
-      console.error('Error fetching tracks:', err);
+      console.error('Error loading tracks:', err);
+      
+      // Create clear, user-friendly error messages
       const audioError: AudioError = {
         type: 'network',
-        message: err instanceof Error ? err.message : 'Failed to fetch tracks',
+        message: err instanceof Error ? err.message : 'Unable to load music library',
       };
+      
       setError(audioError);
-      // Don't set empty tracks on error - let the component handle fallbacks
+      
+      // Don't clear existing tracks on error - let component handle fallbacks
+      // This allows graceful degradation to sample tracks
     } finally {
       setLoading(false);
     }
@@ -145,6 +138,7 @@ export const useAudioTracks = (
    * Refetch tracks (bypasses cache)
    */
   const refetch = useCallback(async (): Promise<void> => {
+    console.log('Refetching tracks (bypassing cache)');
     cache = null; // Clear cache
     await fetchTracks();
   }, [fetchTracks]);
