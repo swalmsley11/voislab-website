@@ -692,7 +692,7 @@ export class VoislabWebsiteStack extends cdk.Stack {
 
     // CloudWatch Monitoring and Alerting
     // TODO: Re-enable monitoring setup after fixing deprecated API usage
-    // this.setupMonitoringAndAlerting(...);
+    // this.setupMonitoringAndAlerting(environment, audioProcessorFunction, formatConverterFunction, pipelineTesterFunction, uatRunnerFunction, contentPromoterFunction, promotionOrchestratorFunction, uploadBucket, mediaBucket, audioMetadataTable, mediaDistribution, notificationTopic);
   }
 
   /**
@@ -800,7 +800,15 @@ export class VoislabWebsiteStack extends cdk.Stack {
       const dynamoThrottleAlarm = new cloudwatch.Alarm(this, 'DynamoThrottleAlarm', {
         alarmName: `voislab-${environment}-dynamodb-throttles`,
         alarmDescription: 'DynamoDB throttling detected',
-        metric: audioMetadataTable.metricThrottledRequests({
+        metric: audioMetadataTable.metricThrottledRequestsForOperations({
+          operations: [
+            dynamodb.Operation.GET_ITEM,
+            dynamodb.Operation.PUT_ITEM,
+            dynamodb.Operation.UPDATE_ITEM,
+            dynamodb.Operation.DELETE_ITEM,
+            dynamodb.Operation.QUERY,
+            dynamodb.Operation.SCAN,
+          ],
           period: cdk.Duration.minutes(5),
           statistic: 'Sum',
         }),
@@ -813,7 +821,15 @@ export class VoislabWebsiteStack extends cdk.Stack {
       const dynamoSystemErrorsAlarm = new cloudwatch.Alarm(this, 'DynamoSystemErrorsAlarm', {
         alarmName: `voislab-${environment}-dynamodb-system-errors`,
         alarmDescription: 'DynamoDB system errors detected',
-        metric: audioMetadataTable.metricSystemErrors({
+        metric: audioMetadataTable.metricSystemErrorsForOperations({
+          operations: [
+            dynamodb.Operation.GET_ITEM,
+            dynamodb.Operation.PUT_ITEM,
+            dynamodb.Operation.UPDATE_ITEM,
+            dynamodb.Operation.DELETE_ITEM,
+            dynamodb.Operation.QUERY,
+            dynamodb.Operation.SCAN,
+          ],
           period: cdk.Duration.minutes(5),
           statistic: 'Sum',
         }),
